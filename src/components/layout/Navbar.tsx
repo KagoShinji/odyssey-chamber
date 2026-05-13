@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+﻿import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ArrowUpRight, Menu, X } from "lucide-react";
+import { ChevronDown, ArrowUpRight } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 const navLinks = [
@@ -36,6 +36,7 @@ const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const location = useLocation();
 
   useEffect(() => {
     const onScroll = () => {
@@ -62,7 +63,7 @@ const Navbar: React.FC = () => {
         aria-hidden="true"
       />
 
-      {/* Fluid Island Nav — floats, not edge-to-edge */}
+      {/* Fluid Island Nav  floats, not edge-to-edge */}
       <header className="fixed top-0 left-0 right-0 z-[100] flex justify-center pt-5 px-4 pointer-events-none">
         <motion.nav
           initial={{ opacity: 0, y: -16 }}
@@ -77,9 +78,14 @@ const Navbar: React.FC = () => {
           aria-label="Main navigation"
         >
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0" aria-label="Talisay Chamber – Home">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-700 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-diffuse">
-              <span className="text-white font-heading font-bold text-[11px]">TC</span>
+          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0" aria-label="Talisay Chamber - Home">
+            <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-diffuse bg-white/5">
+              <img
+                src="/talisaychamberlogo.jpg"
+                alt="Talisay Chamber logo"
+                className="w-full h-full object-contain"
+                loading="eager"
+              />
             </div>
             <span className={cn(
               "font-heading font-bold text-[14px] leading-tight hidden sm:block spring",
@@ -91,7 +97,9 @@ const Navbar: React.FC = () => {
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-1 flex-1 justify-center">
-            {navLinks.map((link) => (
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.path || (link.path !== "/" && location.pathname.startsWith(link.path));
+              return (
               <div
                 key={link.name}
                 className="relative"
@@ -104,7 +112,8 @@ const Navbar: React.FC = () => {
                     "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[13px] font-medium spring-fast cursor-pointer",
                     scrolled
                       ? "text-gray-700 hover:text-green-700 hover:bg-green-50"
-                      : "text-white/80 hover:text-white hover:bg-white/10"
+                      : "text-white/80 hover:text-white hover:bg-white/10",
+                    isActive && (scrolled ? "bg-green-50 text-green-800" : "bg-white/10 text-white")
                   )}
                 >
                   {link.name}
@@ -137,7 +146,8 @@ const Navbar: React.FC = () => {
                   )}
                 </AnimatePresence>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Right actions */}
@@ -164,12 +174,25 @@ const Navbar: React.FC = () => {
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
           >
-            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            <span className="relative block h-4 w-5" aria-hidden="true">
+              <span
+                className={cn(
+                  "absolute left-0 top-1 h-px w-5 bg-current spring-fast",
+                  mobileOpen && "top-2 rotate-45"
+                )}
+              />
+              <span
+                className={cn(
+                  "absolute left-0 top-3 h-px w-5 bg-current spring-fast",
+                  mobileOpen && "top-2 -rotate-45"
+                )}
+              />
+            </span>
           </button>
         </motion.nav>
       </header>
 
-      {/* Mobile overlay — screen-filling glass */}
+      {/* Mobile overlay  screen-filling glass */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -177,7 +200,7 @@ const Navbar: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-[90] bg-[#0D1117]/90 backdrop-blur-2xl flex flex-col pt-24 px-6 pb-10"
+            className="fixed inset-0 z-[90] bg-[#0D1A14]/90 backdrop-blur-2xl flex flex-col pt-24 px-6 pb-10"
           >
             {/* Staggered nav items */}
             <ul className="space-y-1 flex-1">

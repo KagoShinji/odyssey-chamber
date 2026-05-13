@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { motion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { CalendarDays, MapPin, Clock, ArrowRight, Newspaper, ArrowUpRight } from "lucide-react";
@@ -12,24 +12,24 @@ const spring: Variants = {
   }),
 };
 
-/* ═══════════════════════════════════════════
-   EVENTS SECTION — Asymmetric feature layout
-═══════════════════════════════════════════ */
+/* 
+   EVENTS SECTION  Asymmetric feature layout
+ */
 const events = [
   {
-    title: "Talisay Business Summit 2025",
-    date: "June 20, 2025",
-    time: "8:00 AM – 5:00 PM",
+    title: "Talisay Business Summit 2026",
+    date: "June 20, 2026",
+    time: "8:00 AM - 5:00 PM",
     venue: "Talisay City Hall Auditorium",
     tag: "Summit",
-    tagColor: "bg-blue-100 text-blue-700",
+    tagColor: "bg-gold/15 text-amber-800 border border-gold/25",
     img: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=900&auto=format&fit=crop",
     featured: true,
   },
   {
     title: "SME Financing & Investment Forum",
-    date: "July 5, 2025",
-    time: "1:00 PM – 6:00 PM",
+    date: "July 5, 2026",
+    time: "1:00 PM - 6:00 PM",
     venue: "Cityland Commercial Center",
     tag: "Forum",
     tagColor: "bg-green-100 text-green-700",
@@ -38,8 +38,8 @@ const events = [
   },
   {
     title: "Annual Trade Expo & Bazaar",
-    date: "August 12–14, 2025",
-    time: "9:00 AM – 9:00 PM",
+    date: "August 12-14, 2026",
+    time: "9:00 AM - 9:00 PM",
     venue: "Talisay Sports Complex",
     tag: "Expo",
     tagColor: "bg-amber-100 text-amber-700",
@@ -53,19 +53,19 @@ export const EventsSection: React.FC = () => {
   const rest = events.slice(1);
 
   return (
-    <section className="py-32 bg-[#fafafa]" aria-label="Upcoming events">
+    <section className="py-32 section-shell" aria-label="Upcoming events">
       <div className="container mx-auto px-4 md:px-10 max-w-7xl">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
             <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
               className="label-pill mb-5 inline-flex">Events & Seminars</motion.span>
             <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-              className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1117]">
+              className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14]">
               Upcoming events
             </motion.h2>
           </div>
           <motion.div custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-            <button className="btn-premium bg-[#0D1117] text-white hover:-translate-y-0.5 shadow-navy-diffuse">
+            <button className="btn-premium bg-[#0D1A14] text-white hover:-translate-y-0.5 shadow-navy-diffuse">
               View all events
               <span className="btn-icon-wrap !bg-white/10"><ArrowRight size={13} /></span>
             </button>
@@ -75,7 +75,7 @@ export const EventsSection: React.FC = () => {
         {/* Asymmetric layout: large featured card + stacked side cards */}
         <div className="grid lg:grid-cols-[1.3fr_0.7fr] gap-5">
 
-          {/* Featured event — double-bezel */}
+          {/* Featured event  double-bezel */}
           <motion.article
             custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="bezel-outer shadow-diffuse cursor-pointer group"
@@ -84,13 +84,13 @@ export const EventsSection: React.FC = () => {
               <div className="relative h-64 overflow-hidden rounded-t-[calc(2rem-5px)]">
                 <img src={featured.img} alt={featured.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0D1117]/70 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0D1A14]/70 to-transparent" />
                 <span className={`absolute top-4 left-4 text-xs font-heading font-semibold px-3 py-1 rounded-full ${featured.tagColor}`}>
-                  {featured.tag} · Featured
+                  {featured.tag} - Featured
                 </span>
               </div>
               <div className="p-7 flex-1 flex flex-col">
-                <h3 className="font-heading font-bold text-[#0D1117] text-xl mb-4 leading-snug group-hover:text-green-700 spring">
+                <h3 className="font-heading font-bold text-[#0D1A14] text-xl mb-4 leading-snug group-hover:text-green-700 spring">
                   {featured.title}
                 </h3>
                 <div className="grid grid-cols-2 gap-3 text-sm text-gray-400 mb-6">
@@ -121,7 +121,7 @@ export const EventsSection: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className={`text-[10px] font-heading font-semibold px-2.5 py-0.5 rounded-full ${tagColor} inline-block mb-2`}>{tag}</span>
-                  <h3 className="font-heading font-bold text-[#0D1117] text-sm leading-snug mb-2 group-hover:text-green-700 spring line-clamp-2">
+                  <h3 className="font-heading font-bold text-[#0D1A14] text-sm leading-snug mb-2 group-hover:text-green-700 spring line-clamp-2">
                     {title}
                   </h3>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
@@ -138,16 +138,16 @@ export const EventsSection: React.FC = () => {
   );
 };
 
-/* ═══════════════════════════════════════════
-   NEWS SECTION — Masonry-style variable heights
-═══════════════════════════════════════════ */
+/* 
+   NEWS SECTION  Masonry-style variable heights
+ */
 const news = [
   {
     title: "Chamber signs MOU with DTI Region VII for SME development",
     excerpt: "A landmark agreement to accelerate small business growth and livelihood programs across Talisay, benefiting over 300 micro-enterprises.",
-    date: "May 10, 2025",
+    date: "May 10, 2026",
     tag: "Partnership",
-    tagColor: "bg-blue-50 text-blue-600 border border-blue-100",
+    tagColor: "bg-gold/10 text-amber-800 border border-gold/25",
     readTime: "3 min",
     img: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=700&auto=format&fit=crop",
     featured: true,
@@ -155,7 +155,7 @@ const news = [
   {
     title: "Talisay ranks among Cebu's top 5 business-friendly cities",
     excerpt: "Improved ease-of-doing-business scores reflect years of Chamber advocacy work with local government units.",
-    date: "April 28, 2025",
+    date: "April 28, 2026",
     tag: "Economic News",
     tagColor: "bg-green-50 text-green-600 border border-green-100",
     readTime: "4 min",
@@ -164,8 +164,8 @@ const news = [
   },
   {
     title: "38 new businesses join at the latest member orientation",
-    excerpt: "The newest batch spans retail, healthcare, logistics, and services — bringing the total membership to 538.",
-    date: "April 15, 2025",
+    excerpt: "The newest batch spans retail, healthcare, logistics, and services, bringing the total membership to 538.",
+    date: "April 15, 2026",
     tag: "Membership",
     tagColor: "bg-amber-50 text-amber-600 border border-amber-100",
     readTime: "2 min",
@@ -182,7 +182,7 @@ export const NewsSection: React.FC = () => (
           <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="label-pill mb-5 inline-flex">News & Announcements</motion.span>
           <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1117]">
+            className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14]">
             Latest updates
           </motion.h2>
         </div>
@@ -193,7 +193,7 @@ export const NewsSection: React.FC = () => (
         </motion.div>
       </div>
 
-      {/* Asymmetric 2-col: big featured + 2 stacked — items-stretch for equal heights */}
+      {/* Asymmetric 2-col: big featured + 2 stacked  items-stretch for equal heights */}
       <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 items-stretch">
         {/* Featured */}
         {(() => {
@@ -213,7 +213,7 @@ export const NewsSection: React.FC = () => (
                       <span className={`text-[10px] font-heading font-semibold px-2.5 py-0.5 rounded-full ${f.tagColor}`}>{f.tag}</span>
                       <span className="text-xs text-gray-400 flex items-center gap-1"><Newspaper size={10} /> {f.readTime} read</span>
                     </div>
-                    <h3 className="font-heading font-bold text-[#0D1117] text-xl mb-3 leading-snug group-hover:text-green-700 spring">
+                    <h3 className="font-heading font-bold text-[#0D1A14] text-xl mb-3 leading-snug group-hover:text-green-700 spring">
                       {f.title}
                     </h3>
                     <p className="text-gray-500 text-sm leading-relaxed mb-4 flex-1">{f.excerpt}</p>
@@ -225,7 +225,7 @@ export const NewsSection: React.FC = () => (
           );
         })()}
 
-        {/* Side articles — consistent card heights */}
+        {/* Side articles  consistent card heights */}
         <div className="flex flex-col gap-5">
           {news.slice(1).map(({ title, excerpt, date, tag, tagColor, readTime, img }, i) => (
             <motion.article
@@ -241,7 +241,7 @@ export const NewsSection: React.FC = () => (
                   <span className={`text-[10px] font-heading font-semibold px-2 py-0.5 rounded-full ${tagColor}`}>{tag}</span>
                   <span className="text-[10px] text-gray-400">{readTime} read</span>
                 </div>
-                <h3 className="font-heading font-bold text-[#0D1117] text-sm leading-snug mb-2 group-hover:text-green-700 spring line-clamp-2">{title}</h3>
+                <h3 className="font-heading font-bold text-[#0D1A14] text-sm leading-snug mb-2 group-hover:text-green-700 spring line-clamp-2">{title}</h3>
                 <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-2">{excerpt}</p>
                 <span className="text-[11px] text-gray-400">{date}</span>
               </div>
@@ -253,18 +253,18 @@ export const NewsSection: React.FC = () => (
   </section>
 );
 
-/* ═══════════════════════════════════════════
-   CTA SECTION — Dark with grain texture
-═══════════════════════════════════════════ */
+/* 
+   CTA SECTION  Dark with grain texture
+ */
 export const CtaSection: React.FC = () => (
-  <section className="py-32 relative overflow-hidden bg-[#0D1117]" aria-label="Join the Chamber">
+  <section className="py-32 relative overflow-hidden bg-[#0D1A14]" aria-label="Join the Chamber">
     {/* Background imagery */}
     <div
       className="absolute inset-0 opacity-[0.12] bg-cover bg-center"
       style={{ backgroundImage: "url('https://images.unsplash.com/photo-1554469384-e58fac16e23a?q=80&w=2000&auto=format&fit=crop')" }}
       aria-hidden="true"
     />
-    <div className="absolute inset-0 bg-gradient-to-br from-[#0D1117] via-green-950/40 to-[#0D1117]" aria-hidden="true" />
+    <div className="absolute inset-0 bg-gradient-to-br from-[#0D1A14] via-green-950/40 to-[#0D1A14]" aria-hidden="true" />
     {/* Radial glow */}
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-green-800/20 rounded-full blur-3xl pointer-events-none" aria-hidden="true" />
 
@@ -303,7 +303,7 @@ export const CtaSection: React.FC = () => (
           { num: "538", label: "Active Members" },
           { num: "27", label: "Years of Service" },
           { num: "50+", label: "Events/Year" },
-          { num: "₱2B+", label: "Economic Impact" },
+          { num: "PHP 2B+", label: "Economic Impact" },
         ].map(({ num, label }) => (
           <div key={label} className="text-center">
             <div className="text-2xl font-heading font-black text-white tabular-nums">{num}</div>

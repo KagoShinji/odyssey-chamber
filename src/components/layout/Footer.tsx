@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Link } from "react-router-dom";
 import { MapPin, Phone, Mail, ArrowUpRight, Share2, Play, Globe } from "lucide-react";
 
@@ -36,14 +36,14 @@ const footerLinks = {
 };
 
 const socials = [
-  { label: "Facebook", icon: Share2, href: "#" },
-  { label: "YouTube", icon: Play, href: "#" },
-  { label: "Website", icon: Globe, href: "#" },
+  { label: "Facebook", icon: Share2, href: "https://www.facebook.com/" },
+  { label: "YouTube", icon: Play, href: "https://www.youtube.com/" },
+  { label: "Website", icon: Globe, href: "/" },
 ];
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#0F172A] text-slate-300 relative overflow-hidden">
+    <footer className="bg-[#0D1A14] text-slate-300 relative overflow-hidden">
       {/* Decorative green accent stripe */}
       <div className="h-1 w-full bg-gradient-to-r from-green-700 via-emerald-500 to-gold" />
 
@@ -128,10 +128,10 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Newsletter Banner */}
-        <div className="mt-16 rounded-2xl border border-green-900/40 bg-gradient-to-r from-green-900/30 to-emerald-900/20 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="mt-16 rounded-[2rem] border border-white/10 bg-white/[0.035] p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <div>
-            <h4 className="text-white font-heading font-bold text-lg mb-1">Stay Informed</h4>
-            <p className="text-slate-400 text-sm">Get business updates, event announcements, and industry news directly.</p>
+            <h4 className="text-white font-heading font-bold text-lg mb-1">Boardroom briefings</h4>
+            <p className="text-slate-400 text-sm">Monthly policy notes, investment leads, and member-only event alerts.</p>
           </div>
           <form className="flex gap-3 w-full md:w-auto" onSubmit={(e) => e.preventDefault()}>
             <input
@@ -152,7 +152,7 @@ const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>
-            &copy; {new Date().getFullYear()} City of Talisay – Chamber of Commerce, Trade and Industry Inc.
+            &copy; {new Date().getFullYear()} City of Talisay Chamber of Commerce, Trade and Industry Inc.
             All rights reserved.
           </p>
           <div className="flex gap-6">

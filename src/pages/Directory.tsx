@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, MapPin, Building, Globe, Mail, Phone, ExternalLink } from "lucide-react";
 import { CtaSection } from "../components/sections/MoreSections";
@@ -22,15 +22,15 @@ const Directory: React.FC = () => {
 
   const filtered = directory.filter(biz => 
     (activeCategory === "All" || biz.category === activeCategory) &&
-    biz.name.toLowerCase().includes(searchQuery.toLowerCase())
+    [biz.name, biz.category, biz.location].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="flex flex-col w-full pt-32 bg-[#fafafa]">
+    <div className="flex flex-col w-full pt-32 bg-[#fbfaf6]">
       <section className="container mx-auto px-4 md:px-10 max-w-7xl pb-24">
         <div className="max-w-2xl mb-12">
           <motion.span initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="label-pill mb-5 inline-flex">Member Directory</motion.span>
-          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-[clamp(2rem,4vw,3rem)] font-heading font-black text-[#0D1117] leading-tight mb-4">
+          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-[clamp(2rem,4vw,3rem)] font-heading font-black text-[#0D1A14] leading-tight mb-4">
             Find local businesses
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="text-gray-500 text-lg">
@@ -73,13 +73,13 @@ const Directory: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-green-100 transition-all group flex flex-col"
+              className="spotlight-card rounded-[1.5rem] p-6 group flex flex-col"
             >
               <div className="mb-4">
                 <span className="text-[10px] font-heading font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 mb-3 inline-block">
                   {biz.category}
                 </span>
-                <h3 className="font-heading font-bold text-lg text-[#0D1117] leading-tight group-hover:text-green-700 transition-colors">
+                <h3 className="font-heading font-bold text-lg text-[#0D1A14] leading-tight group-hover:text-green-700 transition-colors">
                   {biz.name}
                 </h3>
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
@@ -106,10 +106,12 @@ const Directory: React.FC = () => {
         </div>
         
         {filtered.length === 0 && (
-          <div className="text-center py-20">
-            <Building className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <div className="bezel-outer max-w-xl mx-auto my-12 shadow-diffuse">
+            <div className="bezel-inner px-8 py-14 text-center">
+            <Building className="mx-auto h-12 w-12 text-green-700/35 mb-4" />
             <h3 className="text-lg font-heading font-semibold text-gray-900">No businesses found</h3>
             <p className="text-gray-500 mt-1">Try adjusting your search or category filter.</p>
+            </div>
           </div>
         )}
       </section>

@@ -47,18 +47,18 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         navy: {
-          DEFAULT: "#0D1117",
-          mid: "#1A2332",
-          light: "#2D3748",
+          DEFAULT: "#0D1A14",
+          mid: "#17251D",
+          light: "#2B3A31",
         },
         gold: {
           DEFAULT: "#C9801A",
           light: "#E8A236",
-          pale: "#FCD34D",
+          pale: "#F3D48A",
         },
         green: {
-          brand: "#166534",
-          mid: "#15803d",
+          brand: "#17472B",
+          mid: "#1F6B3E",
         },
       },
       borderRadius: {

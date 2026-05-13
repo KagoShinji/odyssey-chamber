@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { motion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import {
@@ -15,13 +15,13 @@ const spring: Variants = {
   }),
 };
 
-/* ═══════════════════════════════════════════
-   ABOUT SECTION — Z-Axis offset asymmetry
-═══════════════════════════════════════════ */
+/* 
+   ABOUT SECTION  Z-Axis offset asymmetry
+ */
 export const AboutSection: React.FC = () => (
-  <section className="py-32 bg-[#fafafa]" aria-label="About the Chamber">
+  <section className="py-32 section-shell" aria-label="About the Chamber">
     <div className="container mx-auto px-4 md:px-10 max-w-7xl">
-      {/* Left-aligned header — breaks center bias */}
+      {/* Left-aligned header  breaks center bias */}
       <div className="max-w-2xl mb-16">
         <motion.span
           custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
@@ -31,7 +31,7 @@ export const AboutSection: React.FC = () => (
         </motion.span>
         <motion.h2
           custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="text-[clamp(2rem,4vw,3.5rem)] font-heading font-black text-[#0D1117] leading-tight"
+          className="text-[clamp(2rem,4vw,3.5rem)] font-heading font-black text-[#0D1A14] leading-tight"
         >
           Championing business excellence in Talisay
         </motion.h2>
@@ -59,11 +59,11 @@ export const AboutSection: React.FC = () => (
             className="flex flex-wrap gap-8 mb-10 pt-8 border-t border-gray-100">
             {[
               { num: "500+", label: "Active Members" },
-              { num: "₱2B+", label: "Economic Impact" },
+              { num: "PHP 2B+", label: "Economic Impact" },
               { num: "27yrs", label: "Years of Service" },
             ].map(({ num, label }) => (
               <div key={label}>
-                <div className="text-2xl font-heading font-black text-[#0D1117] tabular-nums">{num}</div>
+                <div className="text-2xl font-heading font-black text-[#0D1A14] tabular-nums">{num}</div>
                 <div className="text-xs text-gray-400 mt-1 font-medium tracking-wide uppercase">{label}</div>
               </div>
             ))}
@@ -71,7 +71,7 @@ export const AboutSection: React.FC = () => (
 
           <motion.div custom={5} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="flex gap-3">
-            <button className="btn-premium bg-[#0D1117] hover:bg-navy-mid text-white shadow-navy-diffuse hover:-translate-y-0.5">
+            <button className="btn-premium bg-[#0D1A14] hover:bg-navy-mid text-white shadow-navy-diffuse hover:-translate-y-0.5">
               Our History
               <span className="btn-icon-wrap !bg-white/10"><ArrowUpRight size={13} /></span>
             </button>
@@ -81,16 +81,16 @@ export const AboutSection: React.FC = () => (
           </motion.div>
         </div>
 
-        {/* Right: 2×2 spotlight cards — equal heights via items-stretch */}
+        {/* Right: 22 spotlight cards  equal heights via items-stretch */}
         <div className="grid sm:grid-cols-2 gap-4 items-stretch">
           {[
             { icon: Lightbulb, title: "Our Vision", color: "#166534", bg: "bg-green-50",
               text: "A progressive, globally competitive, and sustainable business community in Talisay." },
-            { icon: Shield, title: "Our Mission", color: "#1D4ED8", bg: "bg-blue-50",
+            { icon: Shield, title: "Our Mission", color: "#17472B", bg: "bg-emerald-50",
               text: "Empower businesses through advocacy, networking, and strategic partnerships.", offset: true },
-            { icon: Target, title: "Core Values", color: "#92400E", bg: "bg-amber-50",
+            { icon: Target, title: "Core Values", color: "#9A6216", bg: "bg-amber-50",
               text: "Integrity, excellence, innovation, collaboration, and community guide everything we do.", offset: false },
-            { icon: Users, title: "Our Goal", color: "#6B21A8", bg: "bg-purple-50",
+            { icon: Users, title: "Our Goal", color: "#2B3A31", bg: "bg-stone-100",
               text: "1,000 thriving local businesses by 2030 through programs, mentorship, and linkages.", offset: true },
           ].map(({ icon: Icon, title, color, bg, text }, i) => (
             <motion.div
@@ -101,7 +101,7 @@ export const AboutSection: React.FC = () => (
               <div className={`w-11 h-11 rounded-2xl ${bg} flex items-center justify-center mb-5 flex-shrink-0`} style={{ color }}>
                 <Icon size={20} />
               </div>
-              <h3 className="font-heading font-bold text-[#0D1117] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
+              <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
               <p className="text-gray-500 text-sm leading-relaxed flex-1">{text}</p>
             </motion.div>
           ))}
@@ -111,10 +111,10 @@ export const AboutSection: React.FC = () => (
   </section>
 );
 
-/* ═══════════════════════════════════════════
-   SERVICES — Bento asymmetric grid
+/* 
+   SERVICES  Bento asymmetric grid
    Replaces generic 3-column equal layout
-═══════════════════════════════════════════ */
+ */
 const services = [
   { icon: Users,       title: "Business Networking",   desc: "Connect with Talisay's top entrepreneurs, industry leaders, and decision-makers at curated events.", span: "lg:col-span-2" },
   { icon: TrendingUp,  title: "Investment Promotion",  desc: "Positioning Talisay as Cebu's premier investment corridor for local and foreign capital.", span: "" },
@@ -138,7 +138,7 @@ export const ServicesSection: React.FC = () => (
         <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
           className="label-pill mb-5 inline-flex">What We Do</motion.span>
         <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1117] mb-4">
+          className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14] mb-4">
           Comprehensive business services
         </motion.h2>
         <motion.p custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
@@ -147,7 +147,7 @@ export const ServicesSection: React.FC = () => (
         </motion.p>
       </div>
 
-      {/* Bento grid — uniform row heights via auto-rows */}
+      {/* Bento grid  uniform row heights via auto-rows */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ gridAutoRows: '1fr' }}>
         {services.map(({ icon: Icon, title, desc, span }, i) => (
           <motion.div
@@ -158,7 +158,7 @@ export const ServicesSection: React.FC = () => (
             <div className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-100/80 flex items-center justify-center text-gray-400 mb-6 flex-shrink-0 spring group-hover:bg-green-700 group-hover:border-green-700 group-hover:text-white">
               <Icon size={20} />
             </div>
-            <h3 className="font-heading font-bold text-[#0D1117] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
+            <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
             <p className="text-gray-400 text-sm leading-relaxed flex-1">{desc}</p>
             <div className="mt-5 flex items-center gap-1.5 text-xs font-heading font-semibold text-gray-300 group-hover:text-green-600 spring">
               Learn more <ArrowUpRight size={12} />
@@ -170,14 +170,14 @@ export const ServicesSection: React.FC = () => (
   </section>
 );
 
-/* ═══════════════════════════════════════════
-   MEMBERSHIP — Premium pricing with emphasis
+/* 
+   MEMBERSHIP  Premium pricing with emphasis
    Replaces generic 3-tower identical layout
-═══════════════════════════════════════════ */
+ */
 const plans = [
   {
     name: "Individual",
-    price: "₱1,500",
+    price: "PHP 1,500",
     period: "/yr",
     desc: "For solo entrepreneurs starting their journey.",
     features: ["Networking access", "Event invitations", "Member directory listing"],
@@ -185,7 +185,7 @@ const plans = [
   },
   {
     name: "SME",
-    price: "₱5,000",
+    price: "PHP 5,000",
     period: "/yr",
     desc: "Most popular for growing small and medium businesses.",
     features: ["All Individual benefits", "Business promotion", "Training & seminars access", "Priority support"],
@@ -194,7 +194,7 @@ const plans = [
   },
   {
     name: "Corporate",
-    price: "₱15,000",
+    price: "PHP 15,000",
     period: "/yr",
     desc: "For established corporations seeking maximum visibility.",
     features: ["All SME benefits", "Board meeting access", "Co-branding rights", "VIP event seating"],
@@ -203,13 +203,13 @@ const plans = [
 ];
 
 export const MembershipSection: React.FC = () => (
-  <section className="py-32 bg-[#fafafa]" aria-label="Membership plans">
+  <section className="py-32 section-shell" aria-label="Membership plans">
     <div className="container mx-auto px-4 md:px-10 max-w-6xl">
       <div className="text-center max-w-xl mx-auto mb-16">
         <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
           className="label-pill mb-5 inline-flex">Membership</motion.span>
         <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1117] mb-4">
+          className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14] mb-4">
           Join the Chamber today
         </motion.h2>
         <motion.p custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
@@ -241,18 +241,18 @@ export const MembershipSection: React.FC = () => (
               {name}
             </div>
 
-            {/* Price — fixed height block so all cards align below it */}
+            {/* Price  fixed height block so all cards align below it */}
             <div className="flex items-end gap-1.5 mb-2 h-12">
-              <span className={`text-[2.75rem] font-heading font-black leading-none ${highlight ? "text-white" : "text-[#0D1117]"}`}>
+              <span className={`text-[2.75rem] font-heading font-black leading-none ${highlight ? "text-white" : "text-[#0D1A14]"}`}>
                 {price}
               </span>
               <span className={`text-sm mb-1 ${highlight ? "text-green-200" : "text-gray-400"}`}>{period}</span>
             </div>
 
-            {/* Desc — fixed height so features always start at same Y */}
+            {/* Desc  fixed height so features always start at same Y */}
             <p className={`text-sm mb-6 leading-relaxed min-h-[3rem] ${highlight ? "text-green-100" : "text-gray-400"}`}>{desc}</p>
 
-            {/* Features — grow to fill space, pushing button to bottom */}
+            {/* Features  grow to fill space, pushing button to bottom */}
             <ul className="space-y-2.5 flex-1 mb-8">
               {features.map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -262,13 +262,13 @@ export const MembershipSection: React.FC = () => (
               ))}
             </ul>
 
-            {/* CTA — always pinned to bottom via mt-auto on the button wrapper */}
+            {/* CTA  always pinned to bottom via mt-auto on the button wrapper */}
             <div className="mt-auto">
               <button
                 className={`btn-premium justify-center w-full spring-fast ${
                   highlight
                     ? "bg-white text-green-700 hover:bg-green-50 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
-                    : "bg-[#0D1117] text-white hover:bg-navy-mid shadow-navy-diffuse"
+                    : "bg-[#0D1A14] text-white hover:bg-navy-mid shadow-navy-diffuse"
                 }`}
               >
                 Get Started
