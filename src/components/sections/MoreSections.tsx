@@ -114,7 +114,7 @@ export const EventsSection: React.FC = () => {
               <motion.article
                 key={title}
                 custom={i + 1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                className="spotlight-card flex gap-4 p-5 cursor-pointer group"
+                className="spotlight-card flex gap-4 p-5 cursor-pointer group flex-1"
               >
                 <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
                   <img src={img} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -193,8 +193,8 @@ export const NewsSection: React.FC = () => (
         </motion.div>
       </div>
 
-      {/* Asymmetric 2-col: big featured + 2 stacked */}
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
+      {/* Asymmetric 2-col: big featured + 2 stacked — items-stretch for equal heights */}
+      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 items-stretch">
         {/* Featured */}
         {(() => {
           const f = news[0];
@@ -203,12 +203,12 @@ export const NewsSection: React.FC = () => (
               custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
               className="group cursor-pointer"
             >
-              <div className="bezel-outer shadow-diffuse">
-                <div className="bezel-inner">
-                  <div className="h-56 overflow-hidden rounded-t-[calc(2rem-5px)]">
+              <div className="bezel-outer shadow-diffuse h-full">
+                <div className="bezel-inner flex flex-col h-full">
+                  <div className="h-56 overflow-hidden rounded-t-[calc(2rem-5px)] flex-shrink-0">
                     <img src={f.img} alt={f.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]" />
                   </div>
-                  <div className="p-7">
+                  <div className="p-7 flex flex-col flex-1">
                     <div className="flex items-center gap-3 mb-4">
                       <span className={`text-[10px] font-heading font-semibold px-2.5 py-0.5 rounded-full ${f.tagColor}`}>{f.tag}</span>
                       <span className="text-xs text-gray-400 flex items-center gap-1"><Newspaper size={10} /> {f.readTime} read</span>
@@ -216,7 +216,7 @@ export const NewsSection: React.FC = () => (
                     <h3 className="font-heading font-bold text-[#0D1117] text-xl mb-3 leading-snug group-hover:text-green-700 spring">
                       {f.title}
                     </h3>
-                    <p className="text-gray-500 text-sm leading-relaxed mb-4">{f.excerpt}</p>
+                    <p className="text-gray-500 text-sm leading-relaxed mb-4 flex-1">{f.excerpt}</p>
                     <span className="text-xs text-gray-400">{f.date}</span>
                   </div>
                 </div>
@@ -225,13 +225,13 @@ export const NewsSection: React.FC = () => (
           );
         })()}
 
-        {/* Side articles */}
+        {/* Side articles — consistent card heights */}
         <div className="flex flex-col gap-5">
           {news.slice(1).map(({ title, excerpt, date, tag, tagColor, readTime, img }, i) => (
             <motion.article
               key={title}
               custom={i + 1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-              className="spotlight-card flex gap-4 p-5 cursor-pointer group"
+              className="spotlight-card flex gap-4 p-5 cursor-pointer group flex-1"
             >
               <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0">
                 <img src={img} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

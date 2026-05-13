@@ -81,8 +81,8 @@ export const AboutSection: React.FC = () => (
           </motion.div>
         </div>
 
-        {/* Right: 2×2 spotlight cards — offset stagger */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        {/* Right: 2×2 spotlight cards — equal heights via items-stretch */}
+        <div className="grid sm:grid-cols-2 gap-4 items-stretch">
           {[
             { icon: Lightbulb, title: "Our Vision", color: "#166534", bg: "bg-green-50",
               text: "A progressive, globally competitive, and sustainable business community in Talisay." },
@@ -92,17 +92,17 @@ export const AboutSection: React.FC = () => (
               text: "Integrity, excellence, innovation, collaboration, and community guide everything we do.", offset: false },
             { icon: Users, title: "Our Goal", color: "#6B21A8", bg: "bg-purple-50",
               text: "1,000 thriving local businesses by 2030 through programs, mentorship, and linkages.", offset: true },
-          ].map(({ icon: Icon, title, color, bg, text, offset }, i) => (
+          ].map(({ icon: Icon, title, color, bg, text }, i) => (
             <motion.div
               key={title}
               custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-              className={`spotlight-card p-7 ${offset ? "sm:mt-8" : ""}`}
+              className="spotlight-card p-7 flex flex-col"
             >
-              <div className={`w-11 h-11 rounded-2xl ${bg} flex items-center justify-center mb-5`} style={{ color }}>
+              <div className={`w-11 h-11 rounded-2xl ${bg} flex items-center justify-center mb-5 flex-shrink-0`} style={{ color }}>
                 <Icon size={20} />
               </div>
               <h3 className="font-heading font-bold text-[#0D1117] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">{text}</p>
+              <p className="text-gray-500 text-sm leading-relaxed flex-1">{text}</p>
             </motion.div>
           ))}
         </div>
@@ -147,19 +147,19 @@ export const ServicesSection: React.FC = () => (
         </motion.p>
       </div>
 
-      {/* Bento grid — asymmetric */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Bento grid — uniform row heights via auto-rows */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ gridAutoRows: '1fr' }}>
         {services.map(({ icon: Icon, title, desc, span }, i) => (
           <motion.div
             key={title}
             custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className={`group spotlight-card p-8 cursor-pointer ${span}`}
+            className={`group spotlight-card p-8 cursor-pointer flex flex-col ${span}`}
           >
-            <div className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-100/80 flex items-center justify-center text-gray-400 mb-6 spring group-hover:bg-green-700 group-hover:border-green-700 group-hover:text-white">
+            <div className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-100/80 flex items-center justify-center text-gray-400 mb-6 flex-shrink-0 spring group-hover:bg-green-700 group-hover:border-green-700 group-hover:text-white">
               <Icon size={20} />
             </div>
             <h3 className="font-heading font-bold text-[#0D1117] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
-            <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
+            <p className="text-gray-400 text-sm leading-relaxed flex-1">{desc}</p>
             <div className="mt-5 flex items-center gap-1.5 text-xs font-heading font-semibold text-gray-300 group-hover:text-green-600 spring">
               Learn more <ArrowUpRight size={12} />
             </div>
@@ -218,14 +218,15 @@ export const MembershipSection: React.FC = () => (
         </motion.p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-5 items-start">
+      {/* Use items-stretch so all 3 cards grow to the same height */}
+      <div className="grid md:grid-cols-3 gap-5 items-stretch">
         {plans.map(({ name, price, period, desc, features, highlight, badge }, i) => (
           <motion.div
             key={name}
             custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className={`relative rounded-[2rem] p-8 flex flex-col spring-fast ${
               highlight
-                ? "bg-green-700 shadow-diffuse-lg scale-[1.03]"
+                ? "bg-green-700 shadow-diffuse-lg"
                 : "bg-white spotlight-card"
             }`}
           >
@@ -240,18 +241,18 @@ export const MembershipSection: React.FC = () => (
               {name}
             </div>
 
-            {/* Price */}
-            <div className="flex items-end gap-1.5 mb-2">
+            {/* Price — fixed height block so all cards align below it */}
+            <div className="flex items-end gap-1.5 mb-2 h-12">
               <span className={`text-[2.75rem] font-heading font-black leading-none ${highlight ? "text-white" : "text-[#0D1117]"}`}>
                 {price}
               </span>
               <span className={`text-sm mb-1 ${highlight ? "text-green-200" : "text-gray-400"}`}>{period}</span>
             </div>
 
-            {/* Desc */}
-            <p className={`text-sm mb-6 leading-relaxed ${highlight ? "text-green-100" : "text-gray-400"}`}>{desc}</p>
+            {/* Desc — fixed height so features always start at same Y */}
+            <p className={`text-sm mb-6 leading-relaxed min-h-[3rem] ${highlight ? "text-green-100" : "text-gray-400"}`}>{desc}</p>
 
-            {/* Features */}
+            {/* Features — grow to fill space, pushing button to bottom */}
             <ul className="space-y-2.5 flex-1 mb-8">
               {features.map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -261,19 +262,21 @@ export const MembershipSection: React.FC = () => (
               ))}
             </ul>
 
-            {/* CTA */}
-            <button
-              className={`btn-premium justify-center w-full spring-fast ${
-                highlight
-                  ? "bg-white text-green-700 hover:bg-green-50 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
-                  : "bg-[#0D1117] text-white hover:bg-navy-mid shadow-navy-diffuse"
-              }`}
-            >
-              Get Started
-              <span className={`btn-icon-wrap ${highlight ? "!bg-green-100/60" : "!bg-white/10"}`}>
-                <ArrowUpRight size={13} />
-              </span>
-            </button>
+            {/* CTA — always pinned to bottom via mt-auto on the button wrapper */}
+            <div className="mt-auto">
+              <button
+                className={`btn-premium justify-center w-full spring-fast ${
+                  highlight
+                    ? "bg-white text-green-700 hover:bg-green-50 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
+                    : "bg-[#0D1117] text-white hover:bg-navy-mid shadow-navy-diffuse"
+                }`}
+              >
+                Get Started
+                <span className={`btn-icon-wrap ${highlight ? "!bg-green-100/60" : "!bg-white/10"}`}>
+                  <ArrowUpRight size={13} />
+                </span>
+              </button>
+            </div>
           </motion.div>
         ))}
       </div>

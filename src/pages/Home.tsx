@@ -96,20 +96,46 @@ const TestimonialsSection: React.FC = () => (
       </h2>
     </div>
 
-    {/* Grid layout for testimonials — breaks 3-equal-card bias */}
-    <div className="container mx-auto px-4 md:px-10 max-w-7xl">
+    {/* Row 1: 3 cards. Row 2: 2 cards centered — no empty cells */}
+    <div className="container mx-auto px-4 md:px-10 max-w-7xl space-y-4">
+      {/* First row: 3 cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {testimonials.slice(0, 5).map(({ name, role, text, initials, color }, i) => (
+        {testimonials.slice(0, 3).map(({ name, role, text, initials, color }, i) => (
           <motion.div
             key={name}
             initial={{ opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: i * 0.1, ease: [0.32, 0.72, 0, 1] }}
-            className={`rounded-[2rem] p-7 border border-white/6 bg-white/[0.03] hover:bg-white/[0.06] spring cursor-default ${i === 2 ? "lg:row-span-1 lg:col-span-1" : ""}`}
+            className="rounded-[2rem] p-7 border border-white/6 bg-white/[0.03] hover:bg-white/[0.06] spring cursor-default flex flex-col"
           >
             <div className="text-4xl font-serif text-green-900/60 leading-none mb-4 select-none">"</div>
-            <p className="text-slate-300 leading-[1.8] mb-6 text-[15px]">{text}</p>
+            <p className="text-slate-300 leading-[1.8] mb-6 text-[15px] flex-1">{text}</p>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center text-white text-xs font-heading font-bold flex-shrink-0`}>
+                {initials}
+              </div>
+              <div>
+                <div className="font-heading font-semibold text-white text-sm leading-tight">{name}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{role}</div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+      {/* Second row: 2 cards centered using max-w + mx-auto */}
+      <div className="grid md:grid-cols-2 gap-4 max-w-[calc(66.66%+0.5rem)] mx-auto lg:max-w-[66.66%]">
+        {testimonials.slice(3, 5).map(({ name, role, text, initials, color }, i) => (
+          <motion.div
+            key={name}
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: (i + 3) * 0.1, ease: [0.32, 0.72, 0, 1] }}
+            className="rounded-[2rem] p-7 border border-white/6 bg-white/[0.03] hover:bg-white/[0.06] spring cursor-default flex flex-col"
+          >
+            <div className="text-4xl font-serif text-green-900/60 leading-none mb-4 select-none">"</div>
+            <p className="text-slate-300 leading-[1.8] mb-6 text-[15px] flex-1">{text}</p>
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center text-white text-xs font-heading font-bold flex-shrink-0`}>
                 {initials}
