@@ -142,16 +142,16 @@ const Navbar: React.FC = () => {
 
           {/* Right actions */}
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <span className={cn(
+            <Link to="/login" className={cn(
               "text-[13px] font-medium cursor-pointer px-3 py-1.5 rounded-full spring-fast",
               scrolled ? "text-gray-600 hover:text-green-700 hover:bg-green-50" : "text-white/70 hover:text-white hover:bg-white/10"
             )}>
               Login
-            </span>
-            <button className="btn-premium !py-2 !px-4 !text-[13px] bg-green-700 hover:bg-green-600 text-white shadow-diffuse">
+            </Link>
+            <Link to="/register" className="btn-premium !py-2 !px-4 !text-[13px] bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex">
               Join Chamber
               <span className="btn-icon-wrap !w-5 !h-5 !bg-white/15"><ArrowUpRight size={11} /></span>
-            </button>
+            </Link>
           </div>
 
           {/* Mobile toggle */}
@@ -208,13 +208,13 @@ const Navbar: React.FC = () => {
               transition={{ duration: 0.4, delay: 0.5 }}
               className="flex flex-col gap-3 pt-8"
             >
-              <button className="btn-premium justify-center w-full bg-green-700 hover:bg-green-600 text-white shadow-diffuse" onClick={() => setMobileOpen(false)}>
+              <Link to="/register" className="btn-premium justify-center w-full bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex" onClick={() => setMobileOpen(false)}>
                 Join the Chamber
                 <span className="btn-icon-wrap !bg-white/15"><ArrowUpRight size={14} /></span>
-              </button>
-              <button className="btn-premium justify-center w-full glass-dark text-white" onClick={() => setMobileOpen(false)}>
+              </Link>
+              <Link to="/login" className="btn-premium justify-center w-full glass-dark text-white inline-flex" onClick={() => setMobileOpen(false)}>
                 Member Login
-              </button>
+              </Link>
             </motion.div>
           </motion.div>
         )}
