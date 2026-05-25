@@ -1,9 +1,11 @@
-﻿import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, Mail, Lock, User, Building } from "lucide-react";
+import { ArrowRight, Mail, Lock, User, Building, Eye, EyeOff } from "lucide-react";
 
 const Register: React.FC = () => {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fbfaf6] pt-24 pb-12 px-4 relative overflow-hidden">
       {/* Background decorations */}
@@ -62,7 +64,14 @@ const Register: React.FC = () => {
             <label className="block text-[13px] font-heading font-semibold text-gray-700 mb-1.5 ml-1">Password</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input type="password" placeholder="Create a strong password" className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
+              <input type={showPassword ? "text" : "password"} placeholder="Create a strong password" className="w-full pl-11 pr-11 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
