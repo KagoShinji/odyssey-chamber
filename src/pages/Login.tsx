@@ -1,10 +1,60 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user) {
+        // Check user role to route appropriately
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profile?.role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+      }
+
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#fbfaf6] pt-24 pb-12 px-4 relative overflow-hidden">
@@ -26,19 +76,39 @@ const Login: React.FC = () => {
           <p className="text-sm text-gray-500">Sign in to your member portal</p>
         </div>
 
-        <form className="space-y-5">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSignIn} className="space-y-5">
           <div>
             <label className="block text-[13px] font-heading font-semibold text-gray-700 mb-1.5 ml-1">Email Address</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input type="email" placeholder="you@company.com" className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
+              <input
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all"
+              />
             </div>
           </div>
           <div>
             <label className="block text-[13px] font-heading font-semibold text-gray-700 mb-1.5 ml-1">Password</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input type={showPassword ? "text" : "password"} placeholder="Enter your password" className="w-full pl-11 pr-11 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full pl-11 pr-11 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all"
+              />
               <button 
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -57,9 +127,21 @@ const Login: React.FC = () => {
             <a href="/login" className="text-green-700 font-medium hover:text-green-800">Forgot password?</a>
           </div>
 
-          <button type="button" className="w-full btn-premium bg-[#0D1A14] hover:bg-navy-mid text-white justify-center shadow-navy-diffuse mt-2">
-            Sign In
-            <span className="btn-icon-wrap !bg-white/10"><ArrowRight size={14} /></span>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full btn-premium bg-[#0D1A14] hover:bg-navy-mid text-white justify-center shadow-navy-diffuse mt-2 disabled:opacity-75 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" /> Signing In...
+              </span>
+            ) : (
+              <>
+                Sign In
+                <span className="btn-icon-wrap !bg-white/10"><ArrowRight size={14} /></span>
+              </>
+            )}
           </button>
         </form>
 

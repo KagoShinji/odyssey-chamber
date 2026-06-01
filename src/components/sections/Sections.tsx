@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import {
@@ -6,6 +6,8 @@ import {
   Landmark, Handshake, Megaphone, Globe, CheckCircle2, ArrowUpRight
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { supabase } from "../../lib/supabase";
+
 
 const spring: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -202,84 +204,121 @@ const plans = [
   },
 ];
 
-export const MembershipSection: React.FC = () => (
-  <section className="py-32 section-shell" aria-label="Membership plans">
-    <div className="container mx-auto px-4 md:px-10 max-w-6xl">
-      <div className="text-center max-w-xl mx-auto mb-16">
-        <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="label-pill mb-5 inline-flex">Membership</motion.span>
-        <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14] mb-4">
-          Join the Chamber today
-        </motion.h2>
-        <motion.p custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-          className="text-gray-500 leading-relaxed">
-          Choose a plan and unlock Talisay's most powerful business network.
-        </motion.p>
-      </div>
+export const MembershipSection: React.FC = () => {
+  const [dbPlans, setDbPlans] = React.useState<any[]>([]);
 
-      {/* Use items-stretch so all 3 cards grow to the same height */}
-      <div className="grid md:grid-cols-3 gap-5 items-stretch">
-        {plans.map(({ name, price, period, desc, features, highlight, badge }, i) => (
-          <motion.div
-            key={name}
-            custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className={`relative rounded-[2rem] p-8 flex flex-col spring-fast ${
-              highlight
-                ? "bg-green-700 shadow-diffuse-lg"
-                : "bg-white spotlight-card"
-            }`}
-          >
-            {badge && (
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gold text-white text-[10px] font-heading font-bold rounded-full tracking-widest uppercase shadow-sm">
-                {badge}
+  React.useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("membership_pricing")
+          .select("*")
+          .eq("is_active", true)
+          .order("price", { ascending: true });
+        if (data && data.length > 0) {
+          setDbPlans(data);
+        }
+      } catch (err) {
+        console.error("Error fetching pricing from Supabase:", err);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  const displayPlans = dbPlans.length > 0 
+    ? dbPlans.map(p => ({
+        name: p.name,
+        price: `PHP ${Number(p.price).toLocaleString()}`,
+        period: `/${p.period}`,
+        desc: p.description,
+        features: p.benefits,
+        highlight: p.type === "sme",
+        badge: p.type === "sme" ? "Most Popular" : undefined
+      })) 
+    : plans;
+
+  return (
+    <section className="py-32 section-shell" aria-label="Membership plans">
+      <div className="container mx-auto px-4 md:px-10 max-w-6xl">
+        <div className="text-center max-w-xl mx-auto mb-16">
+          <motion.span custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="label-pill mb-5 inline-flex">Membership</motion.span>
+          <motion.h2 custom={1} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="text-[clamp(1.875rem,3.5vw,3rem)] font-heading font-black text-[#0D1A14] mb-4">
+            Join the Chamber today
+          </motion.h2>
+          <motion.p custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="text-gray-500 leading-relaxed">
+            Choose a plan and unlock Talisay's most powerful business network.
+          </motion.p>
+        </div>
+
+        {/* Use items-stretch so all 3 cards grow to the same height */}
+        <div className="grid md:grid-cols-3 gap-5 items-stretch">
+          {displayPlans.map(({ name, price, period, desc, features, highlight, badge }, i) => (
+            <motion.div
+              key={name}
+              custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+              className={`relative rounded-[2rem] p-8 flex flex-col spring-fast ${
+                highlight
+                  ? "bg-green-700 shadow-diffuse-lg"
+                  : "bg-white spotlight-card"
+              }`}
+            >
+              {badge && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gold text-white text-[10px] font-heading font-bold rounded-full tracking-widest uppercase shadow-sm">
+                  {badge}
+                </div>
+              )}
+
+              {/* Plan name */}
+              <div className={`text-[10px] font-heading font-bold uppercase tracking-[0.2em] mb-3 ${highlight ? "text-green-200" : "text-gray-400"}`}>
+                {name}
               </div>
-            )}
 
-            {/* Plan name */}
-            <div className={`text-[10px] font-heading font-bold uppercase tracking-[0.2em] mb-3 ${highlight ? "text-green-200" : "text-gray-400"}`}>
-              {name}
-            </div>
-
-            {/* Price  fixed height block so all cards align below it */}
-            <div className="flex items-end gap-1.5 mb-2 h-12">
-              <span className={`text-[2.75rem] font-heading font-black leading-none ${highlight ? "text-white" : "text-[#0D1A14]"}`}>
-                {price}
-              </span>
-              <span className={`text-sm mb-1 ${highlight ? "text-green-200" : "text-gray-400"}`}>{period}</span>
-            </div>
-
-            {/* Desc  fixed height so features always start at same Y */}
-            <p className={`text-sm mb-6 leading-relaxed min-h-[3rem] ${highlight ? "text-green-100" : "text-gray-400"}`}>{desc}</p>
-
-            {/* Features  grow to fill space, pushing button to bottom */}
-            <ul className="space-y-2.5 flex-1 mb-8">
-              {features.map((f) => (
-                <li key={f} className="flex items-start gap-2.5 text-sm">
-                  <CheckCircle2 size={14} className={`mt-0.5 flex-shrink-0 ${highlight ? "text-green-300" : "text-green-600"}`} />
-                  <span className={highlight ? "text-green-50" : "text-gray-600"}>{f}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA  always pinned to bottom via mt-auto on the button wrapper */}
-            <div className="mt-auto">
-              <button
-                className={`btn-premium justify-center w-full spring-fast ${
-                  highlight
-                    ? "bg-white text-green-700 hover:bg-green-50 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
-                    : "bg-[#0D1A14] text-white hover:bg-navy-mid shadow-navy-diffuse"
-                }`}
-              >
-                Get Started
-                <span className={`btn-icon-wrap ${highlight ? "!bg-green-100/60" : "!bg-white/10"}`}>
-                  <ArrowUpRight size={13} />
+              {/* Price  fixed height block so all cards align below it */}
+              <div className="flex items-end gap-1.5 mb-2 h-12">
+                <span className={`text-[2.75rem] font-heading font-black leading-none ${highlight ? "text-white" : "text-[#0D1A14]"}`}>
+                  {price}
                 </span>
-              </button>
-            </div>
-          </motion.div>
-        ))}
+                <span className={`text-sm mb-1 ${highlight ? "text-green-200" : "text-gray-400"}`}>{period}</span>
+              </div>
+
+              {/* Desc  fixed height so features always start at same Y */}
+              <p className={`text-sm mb-6 leading-relaxed min-h-[3rem] ${highlight ? "text-green-100" : "text-gray-400"}`}>{desc}</p>
+
+              {/* Features  grow to fill space, pushing button to bottom */}
+              <ul className="space-y-2.5 flex-1 mb-8">
+                {features.map((f: string) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <CheckCircle2 size={14} className={`mt-0.5 flex-shrink-0 ${highlight ? "text-green-300" : "text-green-600"}`} />
+                    <span className={highlight ? "text-green-50" : "text-gray-600"}>{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+
+              {/* CTA  always pinned to bottom via mt-auto on the button wrapper */}
+              <div className="mt-auto">
+                <a
+                  href="/register"
+                  className={`btn-premium justify-center w-full spring-fast ${
+                    highlight
+                      ? "bg-white text-green-700 hover:bg-green-50 shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
+                      : "bg-[#0D1A14] text-white hover:bg-navy-mid shadow-navy-diffuse"
+                  }`}
+                >
+                  Get Started
+                  <span className={`btn-icon-wrap ${highlight ? "!bg-green-100/60" : "!bg-white/10"}`}>
+                    <ArrowUpRight size={13} />
+                  </span>
+                </a>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
+

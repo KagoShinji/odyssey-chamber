@@ -1,8 +1,10 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ArrowUpRight } from "lucide-react";
+import { ChevronDown, ArrowUpRight, LogOut, User } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useAuth } from "../../context/AuthContext";
+
 
 const navLinks = [
   { name: "Home", path: "/" },
@@ -36,7 +38,9 @@ const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const { user, profile, logout } = useAuth();
   const location = useLocation();
+
 
   useEffect(() => {
     const onScroll = () => {
@@ -152,17 +156,42 @@ const Navbar: React.FC = () => {
 
           {/* Right actions */}
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <Link to="/login" className={cn(
-              "text-[13px] font-medium cursor-pointer px-3 py-1.5 rounded-full spring-fast",
-              scrolled ? "text-gray-600 hover:text-green-700 hover:bg-green-50" : "text-white/70 hover:text-white hover:bg-white/10"
-            )}>
-              Login
-            </Link>
-            <Link to="/register" className="btn-premium !py-2 !px-4 !text-[13px] bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex">
-              Join Chamber
-              <span className="btn-icon-wrap !w-5 !h-5 !bg-white/15"><ArrowUpRight size={11} /></span>
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  to={profile?.role === "admin" ? "/admin" : "/dashboard"}
+                  className={cn(
+                    "text-[13px] font-semibold cursor-pointer px-4 py-2 rounded-full spring-fast bg-green-50 text-green-800 border border-green-100 flex items-center gap-1.5 shadow-sm"
+                  )}
+                >
+                  <User size={13} /> {profile?.role === "admin" ? "Admin Portal" : "Dashboard"}
+                </Link>
+                <button
+                  onClick={() => logout()}
+                  className={cn(
+                    "text-[13px] font-medium cursor-pointer px-3 py-1.5 rounded-full spring-fast flex items-center gap-1.5",
+                    scrolled ? "text-gray-600 hover:text-red-600" : "text-white/70 hover:text-red-400"
+                  )}
+                >
+                  <LogOut size={13} /> Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className={cn(
+                  "text-[13px] font-medium cursor-pointer px-3 py-1.5 rounded-full spring-fast",
+                  scrolled ? "text-gray-600 hover:text-green-700 hover:bg-green-50" : "text-white/70 hover:text-white hover:bg-white/10"
+                )}>
+                  Login
+                </Link>
+                <Link to="/register" className="btn-premium !py-2 !px-4 !text-[13px] bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex">
+                  Join Chamber
+                  <span className="btn-icon-wrap !w-5 !h-5 !bg-white/15"><ArrowUpRight size={11} /></span>
+                </Link>
+              </>
+            )}
           </div>
+
 
           {/* Mobile toggle */}
           <button
@@ -231,14 +260,39 @@ const Navbar: React.FC = () => {
               transition={{ duration: 0.4, delay: 0.5 }}
               className="flex flex-col gap-3 pt-8"
             >
-              <Link to="/register" className="btn-premium justify-center w-full bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex" onClick={() => setMobileOpen(false)}>
-                Join the Chamber
-                <span className="btn-icon-wrap !bg-white/15"><ArrowUpRight size={14} /></span>
-              </Link>
-              <Link to="/login" className="btn-premium justify-center w-full glass-dark text-white inline-flex" onClick={() => setMobileOpen(false)}>
-                Member Login
-              </Link>
+              {user ? (
+                <>
+                  <Link
+                    to={profile?.role === "admin" ? "/admin" : "/dashboard"}
+                    className="btn-premium justify-center w-full bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Go to Portal
+                    <span className="btn-icon-wrap !bg-white/15"><ArrowUpRight size={14} /></span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileOpen(false);
+                    }}
+                    className="btn-premium justify-center w-full glass-dark text-red-400 inline-flex"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/register" className="btn-premium justify-center w-full bg-green-700 hover:bg-green-600 text-white shadow-diffuse inline-flex" onClick={() => setMobileOpen(false)}>
+                    Join the Chamber
+                    <span className="btn-icon-wrap !bg-white/15"><ArrowUpRight size={14} /></span>
+                  </Link>
+                  <Link to="/login" className="btn-premium justify-center w-full glass-dark text-white inline-flex" onClick={() => setMobileOpen(false)}>
+                    Member Login
+                  </Link>
+                </>
+              )}
             </motion.div>
+
           </motion.div>
         )}
       </AnimatePresence>

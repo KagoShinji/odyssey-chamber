@@ -1,0 +1,450 @@
+-- Talisay Chamber of Commerce - Database Setup & Migrations
+-- This file contains the complete SQL script to set up your Supabase project database.
+-- Paste this script directly into the Supabase SQL Editor and run it.
+
+-- =========================================================================
+-- OPTIONAL RESET SECTION
+-- If you already ran this script once and want to reset/re-run the whole file,
+-- uncomment the lines below (remove the "-- ") and execute it:
+-- =========================================================================
+-- drop table if exists public.business_directory cascade;
+-- drop table if exists public.news cascade;
+-- drop table if exists public.event_registrations cascade;
+-- drop table if exists public.events cascade;
+-- drop table if exists public.membership_applications cascade;
+-- drop table if exists public.qr_settings cascade;
+-- drop table if exists public.membership_pricing cascade;
+-- drop table if exists public.profiles cascade;
+-- drop trigger if exists on_auth_user_created on auth.users cascade;
+-- drop function if exists public.handle_new_user() cascade;
+-- drop function if exists public.is_admin() cascade;
+
+-- Enable UUID extension
+create extension if not exists "uuid-ossp";
+
+
+-- =========================================================================
+-- TABLES DEFINITION
+-- =========================================================================
+
+-- 1. Profiles Table (extends auth.users)
+create table public.profiles (
+  id uuid references auth.users on delete cascade primary key,
+  email text not null,
+  full_name text,
+  role text not null default 'member' check (role in ('admin', 'member')),
+  membership_status text not null default 'none' check (membership_status in ('none', 'pending', 'active', 'expired', 'rejected')),
+  membership_type text check (membership_type in ('individual', 'sme', 'corporate', 'enterprise', 'associate')),
+  company_name text,
+  phone text,
+  business_address text,
+  business_category text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. Membership Pricing Table (CMS)
+create table public.membership_pricing (
+  id uuid default gen_random_uuid() primary key,
+  type text not null unique check (type in ('individual', 'sme', 'corporate', 'enterprise', 'associate')),
+  name text not null,
+  price numeric not null check (price >= 0),
+  period text not null default 'yr',
+  description text,
+  benefits text[] not null default '{}'::text[],
+  is_active boolean default true not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3. QR & Payment Settings Table (CMS)
+create table public.qr_settings (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text,
+  payment_instructions text,
+  qr_code_url text, -- GCash/Bank Transfer QR image url (or standard placeholder)
+  is_active boolean default true not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 4. Membership Applications Table
+create table public.membership_applications (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  membership_type text not null,
+  company_name text,
+  business_category text,
+  phone text,
+  business_address text,
+  payment_method text not null check (payment_method in ('gcash', 'bank_transfer', 'cash', 'other')),
+  payment_reference text not null,
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'approved', 'rejected')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 5. Events Table (CMS)
+create table public.events (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  description text not null,
+  date date not null,
+  time text not null,
+  venue text not null,
+  speaker text not null,
+  image_url text,
+  capacity integer,
+  price numeric default 0 not null check (price >= 0), -- Member Price (0 = Free)
+  non_member_price numeric default 0 not null check (non_member_price >= 0), -- Non-Member Price (0 = Free)
+  tag text not null default 'Event',
+  tag_color text not null default 'bg-green-100 text-green-700',
+  is_featured boolean default false not null,
+  is_archived boolean default false not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 6. Event Registrations Table
+create table public.event_registrations (
+  id uuid default gen_random_uuid() primary key,
+  event_id uuid references public.events(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade,
+  full_name text not null,
+  email text not null,
+  payment_method text check (payment_method in ('gcash', 'bank_transfer', 'free', 'other')),
+  payment_reference text,
+  payment_status text not null default 'free' check (payment_status in ('free', 'pending', 'paid', 'failed')),
+  attendance_status text not null default 'registered' check (attendance_status in ('registered', 'attended', 'absent')),
+  qr_code text not null unique, -- Generated unique check-in ID (e.g. EVT-XXXXXX)
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 7. News Table (CMS)
+create table public.news (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  summary text not null,
+  content text not null,
+  image_url text,
+  category text not null,
+  read_time text default '3 min' not null,
+  author text not null default 'Chamber Admin',
+  published_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 8. Business Directory Table (CMS / Member Listings)
+create table public.business_directory (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete set null,
+  business_name text not null,
+  description text not null,
+  logo_url text,
+  contact_email text,
+  contact_phone text,
+  website_url text,
+  category text not null,
+  address text not null,
+  is_featured boolean default false not null,
+  is_verified boolean default false not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- =========================================================================
+-- SECURITY DEFINER HELPER FUNCTION FOR ADMIN CHECK
+-- =========================================================================
+
+-- Avoids recursion in policies by querying the profiles table with bypassrls (postgres) credentials
+create or replace function public.is_admin()
+returns boolean security definer set search_path = public as $$
+begin
+  return exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+end;
+$$ language plpgsql;
+
+-- =========================================================================
+-- ROW-LEVEL SECURITY (RLS) POLICIES
+-- =========================================================================
+
+-- Enable RLS on all tables
+alter table public.profiles enable row level security;
+alter table public.membership_pricing enable row level security;
+alter table public.qr_settings enable row level security;
+alter table public.membership_applications enable row level security;
+alter table public.events enable row level security;
+alter table public.event_registrations enable row level security;
+alter table public.news enable row level security;
+alter table public.business_directory enable row level security;
+
+-- 1. Profiles Policies
+create policy "Profiles are viewable by authenticated users"
+  on public.profiles for select
+  to authenticated
+  using (true);
+
+create policy "Users can insert their own profile"
+  on public.profiles for insert
+  to authenticated
+  with check (auth.uid() = id and role = 'member' and membership_status = 'none');
+
+create policy "Profiles can be updated by owners or admins"
+  on public.profiles for update
+  to authenticated
+  using (auth.uid() = id or is_admin())
+  with check (auth.uid() = id or is_admin());
+
+create policy "Profiles can be deleted only by admins"
+  on public.profiles for delete
+  to authenticated
+  using (is_admin());
+
+-- 2. Membership Pricing Policies
+create policy "Pricing is viewable by everyone"
+  on public.membership_pricing for select
+  using (true);
+
+create policy "Pricing is manageable by admins only"
+  on public.membership_pricing for all
+  to authenticated
+  using (is_admin());
+
+-- 3. QR Settings Policies
+create policy "QR settings are viewable by everyone"
+  on public.qr_settings for select
+  using (true);
+
+create policy "QR settings are manageable by admins only"
+  on public.qr_settings for all
+  to authenticated
+  using (is_admin());
+
+-- 4. Membership Applications Policies
+create policy "Users can view their own applications, admins can view all"
+  on public.membership_applications for select
+  to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+create policy "Users can insert their own application"
+  on public.membership_applications for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "Applications are manageable by admins only"
+  on public.membership_applications for update
+  to authenticated
+  using (is_admin());
+
+create policy "Applications can be deleted by admins only"
+  on public.membership_applications for delete
+  to authenticated
+  using (is_admin());
+
+-- 5. Events Policies
+create policy "Events are viewable by everyone"
+  on public.events for select
+  using (true);
+
+create policy "Events are manageable by admins only"
+  on public.events for all
+  to authenticated
+  using (is_admin());
+
+-- 6. Event Registrations Policies
+create policy "Users can view their own registrations, admins can view all"
+  on public.event_registrations for select
+  using (auth.uid() = user_id or is_admin());
+
+create policy "Users can register themselves for events"
+  on public.event_registrations for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "Event registrations are manageable by admins only"
+  on public.event_registrations for update
+  to authenticated
+  using (is_admin());
+
+create policy "Event registrations can be deleted by admins only"
+  on public.event_registrations for delete
+  to authenticated
+  using (is_admin());
+
+-- 7. News Policies
+create policy "News is viewable by everyone"
+  on public.news for select
+  using (true);
+
+create policy "News is manageable by admins only"
+  on public.news for all
+  to authenticated
+  using (is_admin());
+
+-- 8. Business Directory Policies
+create policy "Directory is viewable by everyone"
+  on public.business_directory for select
+  using (true);
+
+create policy "Members can create directory listings"
+  on public.business_directory for insert
+  to authenticated
+  with check (auth.uid() = user_id or is_admin());
+
+create policy "Owners or admins can update directory listings"
+  on public.business_directory for update
+  to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+create policy "Owners or admins can delete directory listings"
+  on public.business_directory for delete
+  to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+
+-- =========================================================================
+-- PROFILE GENERATING TRIGGER
+-- =========================================================================
+
+-- Trigger to create a profile automatically when a user signs up via auth
+create or replace function public.handle_new_user()
+returns trigger as $$
+declare
+  user_full_name text;
+  user_role text;
+begin
+  -- Safe extraction of metadata
+  if new.raw_user_metadata is not null then
+    user_full_name := coalesce(
+      new.raw_user_metadata->>'full_name',
+      nullif(trim(concat(new.raw_user_metadata->>'first_name', ' ', new.raw_user_metadata->>'last_name')), '')
+    );
+    user_role := coalesce(new.raw_user_metadata->>'role', 'member');
+  else
+    user_full_name := null;
+    user_role := 'member';
+  end if;
+
+  -- Ensure role is only 'admin' or 'member'
+  if user_role not in ('admin', 'member') then
+    user_role := 'member';
+  end if;
+
+  insert into public.profiles (id, email, full_name, role, membership_status)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    coalesce(user_full_name, 'New Member'),
+    user_role,
+    'none'
+  );
+  return new;
+exception
+  when others then
+    -- Log error details and return new to let auth.users signup succeed
+    raise warning 'Error in handle_new_user trigger: %', SQLERRM;
+    return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+
+-- =========================================================================
+-- SEED DATA
+-- =========================================================================
+
+-- 1. Seed Membership Pricing
+insert into public.membership_pricing (type, name, price, period, description, benefits) values
+('individual', 'Individual', 1500, 'yr', 'For solo entrepreneurs starting their journey.', array['Networking access', 'Event invitations', 'Member directory listing']),
+('sme', 'SME', 5000, 'yr', 'Most popular for growing small and medium businesses.', array['All Individual benefits', 'Business promotion', 'Training & seminars access', 'Priority support']),
+('corporate', 'Corporate', 15000, 'yr', 'For established corporations seeking maximum visibility.', array['All SME benefits', 'Board meeting access', 'Co-branding rights', 'VIP event seating'])
+on conflict (type) do nothing;
+
+-- 2. Seed QR & Payment Settings
+insert into public.qr_settings (name, description, payment_instructions, qr_code_url) values
+('GCash Payment', 'Pay via GCash transfer to the official Chamber merchant account.', 'Send your payment to GCash account: 0912-345-6789 (John D. / Talisay Chamber Officer). Make sure to take a screenshot and enter the Transaction reference number below.', 'https://api.qrserver.com/v1/create-qr-code/?data=GCash_Talisay_Chamber_09123456789&size=200x200'),
+('Bank Transfer (BDO)', 'Direct deposit to BDO (Banco de Oro) account.', 'Transfer to BDO Account No: 00123-4567-8901 (Talisay Chamber of Commerce Inc). Take a screenshot of the receipt and input the Transaction ID or Reference number below.', 'https://api.qrserver.com/v1/create-qr-code/?data=Bank_BDO_Account_0012345678901&size=200x200');
+
+-- 3. Seed Events
+insert into public.events (title, description, date, time, venue, speaker, price, tag, tag_color, is_featured, image_url) values
+('Talisay Business Summit 2026', 'A premier gathering of business leaders, entrepreneurs, and policymakers discussing the future of commerce in Talisay. Topic: Accelerating Digital Livelihood in Talisay.', '2026-06-20', '8:00 AM - 5:00 PM', 'Talisay City Hall Auditorium', 'Hon. Gerald Anthony Gullas Jr. (Mayor)', 500, 'Summit', 'bg-gold/15 text-amber-800 border border-gold/25', true, 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=900&auto=format&fit=crop'),
+('SME Financing & Investment Forum', 'Learn about capital funding, small business loans, investment models, and grant opportunities backed by DTI and national institutions.', '2026-07-05', '1:00 PM - 6:00 PM', 'Cityland Commercial Center', 'DTI Regional Director & Bank Officers', 0, 'Forum', 'bg-green-100 text-green-700', false, 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?q=80&w=600&auto=format&fit=crop'),
+('Annual Trade Expo & Bazaar', 'A 3-day exhibition event showcasing local Talisay manufacturers, retail companies, food startups, and service providers to the regional market.', '2026-08-12', '9:00 AM - 9:00 PM', 'Talisay Sports Complex', 'Various Local Industry Leaders', 200, 'Expo', 'bg-amber-100 text-amber-700', false, 'https://images.unsplash.com/photo-1473091534298-04dcbce3278c?q=80&w=600&auto=format&fit=crop');
+
+-- 4. Seed News
+insert into public.news (title, summary, content, category, read_time, image_url) values
+('Chamber signs MOU with DTI Region VII for SME development', 'A landmark agreement to accelerate small business growth and livelihood programs across Talisay, benefiting over 300 micro-enterprises.', 'The City of Talisay Chamber of Commerce, Trade and Industry Inc. officially signed a Memorandum of Understanding (MOU) with the Department of Trade and Industry (DTI) Region VII. This partnership aims to execute high-impact training seminars, improve funding channels, and distribute starter kits to over 300 local micro, small, and medium enterprises (MSMEs). The program is scheduled to launch late June 2026.', 'Partnership', '3 min', 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=700&auto=format&fit=crop'),
+('Talisay ranks among Cebu''s top 5 business-friendly cities', 'Improved ease-of-doing-business scores reflect years of Chamber advocacy work with local government units.', 'A recent evaluation of economic competitiveness in Cebu Province placed Talisay City in the top 5 most business-friendly cities. The ranking highlights rapid digitizations of permit applications, tax concessions for green businesses, and infrastructure upgrades. Chamber President praised the LGU for its active partnership in streamlining regulatory processes.', 'Economic News', '4 min', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=700&auto=format&fit=crop'),
+('38 new businesses join at the latest member orientation', 'The newest batch spans retail, healthcare, logistics, and services, bringing the total membership to 538.', 'The Talisay Chamber welcomed 38 new companies at the second-quarter general membership orientation. New members range from tech startups to local health centers, strengthening our local commerce ecosystem. The Chamber now supports a total network of 538 registered entities.', 'Membership', '2 min', 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=700&auto=format&fit=crop');
+
+-- 5. Seed Business Directory
+insert into public.business_directory (business_name, description, contact_email, contact_phone, website_url, category, address, is_featured, is_verified) values
+('Santos Trading Co.', 'A premier retail trading distributor offering local goods and household items in Talisay.', 'info@santostrading.com', '(032) 234-5678', 'santostrading.com', 'Retail', 'Poblacion, Talisay City', true, true),
+('CR Construction & Dev', 'Residential and commercial developers specializing in modern architectural designs and durable buildings.', 'projects@crconstruct.com', '(032) 456-7890', 'crconstruct.com', 'Construction', 'Lawaan I, Talisay City', false, true),
+('Graceland Restaurant Group', 'Serving authentic Cebuano cuisine and catering services for events, corporate parties, and families.', 'hello@graceland.ph', '(032) 345-6789', 'graceland.ph', 'Food & Beverage', 'Tabunok, Talisay City', false, true),
+('Cruz & Reyes Law', 'Full-service legal firm specializing in business litigation, labor laws, and corporate filing.', 'legal@cruzreyes.com', '(032) 567-8901', 'cruzreyes.com', 'Professional Services', 'Bulacao, Talisay City', false, true),
+('Talisay Medical Center', 'Comprehensive healthcare facility offering general medicine, laboratory tests, and specialized clinics.', 'admin@talisaymed.com', '(032) 678-9012', 'talisaymed.com', 'Healthcare', 'San Isidro, Talisay City', false, true),
+('Visayas Tech Solutions', 'Custom software development, network setups, IT consulting, and digital marketing services.', 'contact@visayastech.com', '(032) 789-0123', 'visayastech.com', 'IT & Tech', 'Dumlog, Talisay City', true, true),
+('Cebu South Logistics', 'Fast and secure shipping, warehousing, and inventory fulfillment services for Cebu businesses.', 'operations@cebusouth.ph', '(032) 890-1234', 'cebusouth.ph', 'Logistics', 'Tank, Talisay City', false, true),
+('Green Earth Agri-Farm', 'Sustainable farm producing fresh organic vegetables, poultry, and farming consulting services.', 'farm@greenearth.ph', '(032) 901-2345', 'greenearth.ph', 'Agriculture', 'Camp 4, Talisay City', false, true);
+
+
+-- =========================================================================
+-- HOW TO PROMOTE A USER TO ADMIN:
+-- Run this query substituting your signed-up user''s email:
+-- UPDATE public.profiles SET role = 'admin' WHERE email = 'admin@example.com';
+-- =========================================================================
+
+-- =========================================================================
+-- STORAGE BUCKETS & POLICIES FOR UPLOADS
+-- =========================================================================
+
+-- Insert the public bucket if not exists
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'chamber-assets', 
+  'chamber-assets', 
+  true, 
+  5242880, -- 5MB
+  ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Public read access to objects in chamber-assets
+CREATE POLICY "Public Read Access on Chamber Assets"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'chamber-assets');
+
+-- Allow authenticated users to upload objects to chamber-assets
+CREATE POLICY "Authenticated Insert Access on Chamber Assets"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'chamber-assets');
+
+-- Allow authenticated users to update/overwrite objects in chamber-assets
+CREATE POLICY "Authenticated Update Access on Chamber Assets"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  WITH CHECK (bucket_id = 'chamber-assets');
+
+-- Allow authenticated users to delete objects in chamber-assets
+CREATE POLICY "Authenticated Delete Access on Chamber Assets"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'chamber-assets');
+
+-- Migration: Add non-member price column to events table
+ALTER TABLE public.events ADD COLUMN IF NOT EXISTS non_member_price numeric default 0 not null check (non_member_price >= 0);
+
+-- Migration: Add is_archived column to events table
+ALTER TABLE public.events ADD COLUMN IF NOT EXISTS is_archived boolean default false not null;
