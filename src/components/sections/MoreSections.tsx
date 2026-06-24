@@ -539,9 +539,11 @@ export const NewsSection: React.FC = () => {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const { data } = await supabase.from("news").select("*").order("published_at", { ascending: false });
+        const { data } = await supabase.from("news").select("*").eq("status", "approved").order("published_at", { ascending: false });
         if (data && data.length > 0) {
           setDbNews(data);
+        } else {
+          setDbNews([]);
         }
       } catch (err) {
         console.error(err);

@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Search, Loader2, CalendarDays, MapPin, 
-  User, Check, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle, Camera, X, FileDown
+  User, Check, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle, Camera, X, FileDown,
+  Receipt
 } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "../lib/supabase";
@@ -19,10 +20,13 @@ interface EventData {
   venue: string;
   speaker: string;
   price: number;
+  non_member_price?: number;
 }
 
 interface RegistrationData {
   id: string;
+  event_id: string;
+  user_id: string | null;
   full_name: string;
   email: string;
   payment_method: string;
@@ -30,7 +34,12 @@ interface RegistrationData {
   payment_status: string;
   attendance_status: string;
   qr_code: string;
+  invoice_number?: string | null;
   created_at: string;
+  profiles?: {
+    membership_status: string;
+    role: string;
+  } | null;
 }
 
 const EventRegistrants: React.FC = () => {
@@ -44,6 +53,12 @@ const EventRegistrants: React.FC = () => {
   const [registrants, setRegistrants] = useState<RegistrationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Invoice/Receipt modal states
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedReg, setSelectedReg] = useState<RegistrationData | null>(null);
+  const [invoiceNumInput, setInvoiceNumInput] = useState("");
+  const [modalPaymentStatus, setModalPaymentStatus] = useState("pending");
 
   // Pagination & Search States
   const [searchQuery, setSearchQuery] = useState("");
@@ -312,7 +327,7 @@ const EventRegistrants: React.FC = () => {
       // 2. Fetch list with current filter and pagination
       let query = supabase
         .from("event_registrations")
-        .select("*", { count: "exact" })
+        .select("*, profiles(membership_status, role)", { count: "exact" })
         .eq("event_id", eventId);
 
       if (searchQuery.trim()) {
@@ -392,12 +407,358 @@ const EventRegistrants: React.FC = () => {
       
       // Update local state directly
       setRegistrants(prev => prev.map(r => r.id === regId ? { ...r, payment_status: newStatus } : r));
+      
+      // Update selected registration status if modal is open
+      if (selectedReg && selectedReg.id === regId) {
+        setSelectedReg(prev => prev ? { ...prev, payment_status: newStatus } : null);
+        setModalPaymentStatus(newStatus);
+      }
+      
       toast.success(`Payment status updated to ${newStatus}`);
     } catch (err: any) {
       toast.error("Failed to update payment status: " + err.message);
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // Save invoice number and payment status
+  const handleSaveInvoiceAndStatus = async (regId: string, invoiceNumber: string, payStatus: string) => {
+    let formattedInvoice = invoiceNumber.trim();
+    if (formattedInvoice && !formattedInvoice.toUpperCase().startsWith("INV-")) {
+      formattedInvoice = `INV-${formattedInvoice}`;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("event_registrations")
+        .update({ 
+          invoice_number: formattedInvoice || null,
+          payment_status: payStatus
+        })
+        .eq("id", regId);
+
+      if (error) throw error;
+      
+      // Update local state directly
+      setRegistrants(prev => prev.map(r => 
+        r.id === regId 
+          ? { ...r, invoice_number: formattedInvoice || null, payment_status: payStatus } 
+          : r
+      ));
+      
+      // If selected registration is open, update its state too
+      if (selectedReg && selectedReg.id === regId) {
+        setSelectedReg(prev => prev ? { ...prev, invoice_number: formattedInvoice || null, payment_status: payStatus } : null);
+      }
+      
+      toast.success("Invoice and payment details updated successfully!");
+      setShowInvoiceModal(false);
+    } catch (err: any) {
+      toast.error("Failed to update invoice details: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Print single registration invoice/receipt
+  const handlePrintSingleInvoice = (reg: RegistrationData) => {
+    if (!event) return;
+    
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Pop-up blocker is preventing invoice generation. Please allow pop-ups.");
+      return;
+    }
+    
+    // Determine user type (member vs non-member)
+    const isMember = reg.profiles?.membership_status === "active" || reg.profiles?.role === "admin";
+    const ticketPrice = reg.payment_status === "free" ? 0 : (isMember ? event.price : (event.non_member_price || 0));
+    
+    // Format payment status text
+    const displayStatus = reg.payment_status.toUpperCase();
+    const invoiceDisplayNumber = reg.invoice_number ? reg.invoice_number : "PENDING MATCH";
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice - ${reg.full_name}</title>
+        <style>
+          body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #1f2937;
+            margin: 40px;
+            font-size: 14px;
+            line-height: 1.6;
+          }
+          .invoice-box {
+            max-width: 800px;
+            margin: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 40px;
+            background: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            position: relative;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #059669;
+            padding-bottom: 24px;
+            margin-bottom: 30px;
+          }
+          .logo-area h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #065f46;
+            margin: 0;
+            letter-spacing: -0.02em;
+          }
+          .logo-area p {
+            font-size: 11px;
+            color: #6b7280;
+            margin: 4px 0 0 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+          }
+          .invoice-details {
+            text-align: right;
+          }
+          .invoice-details h2 {
+            font-size: 20px;
+            font-weight: 900;
+            color: #111827;
+            margin: 0;
+            text-transform: uppercase;
+          }
+          .invoice-details p {
+            font-size: 12px;
+            color: #4b5563;
+            margin: 4px 0 0 0;
+          }
+          .invoice-details span {
+            font-family: monospace;
+            font-weight: bold;
+            color: #065f46;
+          }
+          .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+          }
+          .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #f3f4f6;
+            padding-bottom: 4px;
+          }
+          .info-block p {
+            margin: 3px 0;
+            color: #374151;
+          }
+          .info-block strong {
+            color: #111827;
+          }
+          .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+          }
+          .table th {
+            background-color: #f9fafb;
+            color: #374151;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e5e7eb;
+            padding: 12px;
+            text-align: left;
+          }
+          .table td {
+            border-bottom: 1px solid #f3f4f6;
+            padding: 12px;
+            font-size: 13px;
+            color: #374151;
+          }
+          .amount-summary {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-top: 20px;
+            font-size: 13px;
+          }
+          .amount-row {
+            display: flex;
+            width: 250px;
+            justify-content: space-between;
+            padding: 6px 0;
+          }
+          .amount-row.total {
+            border-top: 2px solid #e5e7eb;
+            font-size: 16px;
+            font-weight: 800;
+            color: #111827;
+            padding-top: 10px;
+          }
+          .status-stamp {
+            position: absolute;
+            top: 120px;
+            right: 40px;
+            border: 4px solid #10b981;
+            color: #10b981;
+            font-size: 18px;
+            font-weight: 900;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 8px;
+            opacity: 0.15;
+            transform: rotate(-12deg);
+            pointer-events: none;
+            letter-spacing: 0.1em;
+          }
+          .status-stamp.unpaid {
+            border-color: #f59e0b;
+            color: #f59e0b;
+          }
+          .footer {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+            margin-top: 40px;
+            font-size: 11px;
+            color: #9ca3af;
+            text-align: center;
+          }
+          @media print {
+            body {
+              margin: 0;
+              background-color: #fff;
+            }
+            .invoice-box {
+              border: none;
+              padding: 0;
+              box-shadow: none;
+            }
+            @page {
+              size: portrait;
+              margin: 15mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-box">
+          ${
+            reg.payment_status === "paid" || reg.payment_status === "free"
+              ? `<div class="status-stamp">PAID</div>`
+              : `<div class="status-stamp unpaid">PENDING</div>`
+          }
+
+          <div class="header">
+            <div class="logo-area">
+              <h1>Talisay Chamber of Commerce</h1>
+              <p>Trade, Industry & Livelihood development</p>
+            </div>
+            <div class="invoice-details">
+              <h2>Invoice / Official Receipt</h2>
+              <p>Invoice No: <span>${invoiceDisplayNumber}</span></p>
+              <p>Date: ${new Date(reg.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="info-block">
+              <div class="section-title">Billed To</div>
+              <p><strong>${reg.full_name}</strong></p>
+              <p>${reg.email}</p>
+              <p>Status: ${isMember ? "Active Chamber Member" : "Non-Member Registrant"}</p>
+            </div>
+            <div class="info-block">
+              <div class="section-title">Chamber Information</div>
+              <p><strong>Talisay Chamber of Commerce & Industry Inc.</strong></p>
+              <p>Poblacion, Talisay City, Cebu, Philippines</p>
+              <p>Email: billing@talisaychamber.org</p>
+            </div>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th style="text-align: right; width: 120px;">Unit Price</th>
+                <th style="text-align: right; width: 120px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>Event Entry Pass: ${event.title}</strong><br/>
+                  <span style="font-size: 11px; color: #6b7280;">Venue: ${event.venue} | Date: ${event.date}</span>
+                </td>
+                <td style="text-align: right;">PHP ${ticketPrice.toLocaleString()}</td>
+                <td style="text-align: right;">PHP ${ticketPrice.toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="amount-summary">
+            <div class="amount-row">
+              <span style="color: #6b7280;">Subtotal:</span>
+              <span>PHP ${ticketPrice.toLocaleString()}</span>
+            </div>
+            <div class="amount-row">
+              <span style="color: #6b7280;">Payment Method:</span>
+              <span style="text-transform: capitalize;">${reg.payment_method.replace("_", " ")}</span>
+            </div>
+            ${
+              reg.payment_reference
+                ? `<div class="amount-row">
+                    <span style="color: #6b7280;">Reference:</span>
+                    <span style="font-family: monospace; font-size: 11px;">${reg.payment_reference}</span>
+                  </div>`
+                : ""
+            }
+            <div class="amount-row total">
+              <span>Total Paid:</span>
+              <span>PHP ${ticketPrice.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 60px; font-size: 12px; color: #4b5563;">
+            <p><strong>Terms & Conditions:</strong></p>
+            <p style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+              This serves as an official proof of registration for the event. Please present your digital check-in QR code pass at the registration desk for verification. Tickets are non-refundable.
+            </p>
+          </div>
+
+          <div class="footer">
+            Talisay Chamber of Commerce & Industry Inc. &copy; 2026. All rights reserved.
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 250);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   // Export All Registrants to Printable PDF
@@ -775,7 +1136,7 @@ const EventRegistrants: React.FC = () => {
                   <th className="py-4 px-4">Payment Method</th>
                   <th className="py-4 px-4">Payment Status</th>
                   <th className="py-4 px-4">Attendance</th>
-                  <th className="py-4 px-4 text-right">Check-in Action</th>
+                  <th className="py-4 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-semibold text-gray-200">
@@ -838,17 +1199,31 @@ const EventRegistrants: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <button
-                          onClick={() => handleToggleAttendance(reg.id, reg.attendance_status)}
-                          disabled={actionLoading}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                            reg.attendance_status === "attended"
-                              ? "bg-green-800 hover:bg-green-700 text-white"
-                              : "bg-[#10241A] hover:bg-[#163526] text-green-400"
-                          }`}
-                        >
-                          {reg.attendance_status === "attended" ? "Attended" : "Mark Attended"}
-                        </button>
+                        <div className="flex justify-end items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedReg(reg);
+                              setInvoiceNumInput(reg.invoice_number || "");
+                              setModalPaymentStatus(reg.payment_status);
+                              setShowInvoiceModal(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-white/5 text-[10px] font-bold text-green-400 bg-[#11241C] hover:bg-[#152F24] transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Receipt size={12} />
+                            {reg.invoice_number ? reg.invoice_number : "Invoice"}
+                          </button>
+                          <button
+                            onClick={() => handleToggleAttendance(reg.id, reg.attendance_status)}
+                            disabled={actionLoading}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                              reg.attendance_status === "attended"
+                                ? "bg-green-800 hover:bg-green-700 text-white"
+                                : "bg-[#10241A] hover:bg-[#163526] text-green-400"
+                            }`}
+                          >
+                            {reg.attendance_status === "attended" ? "Attended" : "Mark Attended"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -993,6 +1368,111 @@ const EventRegistrants: React.FC = () => {
               </AnimatePresence>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* INVOICE & RECEIPT MODAL */}
+      <AnimatePresence>
+        {showInvoiceModal && selectedReg && (
+          <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-[#0A1410] border border-white/10 rounded-3xl p-6 overflow-hidden shadow-2xl relative"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6 pb-4 border-b border-white/5">
+                <div>
+                  <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 border border-green-500/20 px-2.5 py-0.5 rounded-full">
+                    Invoice & Payment Manager
+                  </span>
+                  <h3 className="font-heading font-black text-white text-base mt-2">
+                    {selectedReg.full_name}
+                  </h3>
+                  <p className="text-[11px] text-gray-400">{selectedReg.email}</p>
+                </div>
+                <button
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="p-1.5 rounded-xl border border-white/5 text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="space-y-4 text-xs font-semibold text-gray-300">
+                <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Payment Reference:</span>
+                    <span className="font-mono text-white">{selectedReg.payment_reference || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Payment Method:</span>
+                    <span className="capitalize text-white">{selectedReg.payment_method.replace("_", " ")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Pass Code:</span>
+                    <span className="font-mono text-white">{selectedReg.qr_code}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[#8A9690] mb-1">Verify Payment Status</label>
+                  <select
+                    value={modalPaymentStatus}
+                    onChange={(e) => setModalPaymentStatus(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none"
+                  >
+                    <option value="pending">Pending Verification</option>
+                    <option value="paid">Paid (Verified)</option>
+                    <option value="free">Free Access</option>
+                    <option value="rejected">Rejected / Invalid Payment</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#8A9690] mb-1">Invoice / Receipt Number</label>
+                  <input
+                    type="text"
+                    value={invoiceNumInput}
+                    onChange={(e) => setInvoiceNumInput(e.target.value)}
+                    placeholder="e.g. INV-10045"
+                    className="w-full px-3 py-2.5 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none placeholder-gray-600 font-mono text-sm"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1 font-normal">
+                    Enter the invoice number from the physical official receipt copy. (Format starts automatically with 'INV-')
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 pt-6 mt-6 border-t border-white/5">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSaveInvoiceAndStatus(selectedReg.id, invoiceNumInput, modalPaymentStatus)}
+                    disabled={actionLoading}
+                    className="flex-1 py-2.5 rounded-xl bg-green-700 hover:bg-green-600 text-white font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    Save Details
+                  </button>
+                  <button
+                    onClick={() => handlePrintSingleInvoice({ ...selectedReg, invoice_number: invoiceNumInput, payment_status: modalPaymentStatus })}
+                    className="px-4 py-2.5 border border-white/10 hover:bg-white/5 rounded-xl text-white cursor-pointer font-bold transition-colors flex items-center gap-1.5"
+                  >
+                    <FileDown size={14} /> Print PDF
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceModal(false)}
+                  className="w-full py-2 border border-white/5 hover:bg-white/5 rounded-xl text-gray-500 cursor-pointer text-xs"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

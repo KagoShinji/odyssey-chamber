@@ -37,8 +37,7 @@ const footerLinks = {
 
 const socials = [
   { label: "Facebook", icon: Share2, href: "https://www.facebook.com/" },
-  { label: "YouTube", icon: Play, href: "https://www.youtube.com/" },
-  { label: "Website", icon: Globe, href: "/" },
+
 ];
 
 const Footer: React.FC = () => {
@@ -74,15 +73,15 @@ const Footer: React.FC = () => {
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3 text-slate-400 hover:text-slate-200 transition-colors">
                 <MapPin size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Talisay City Hall Compound, Lawaan II,<br />City of Talisay, Cebu, Philippines</span>
+                <span>Paseo Ricardo Commercial Center, Nonoc, Rafael Rabaya Rd<br />City of Talisay, Cebu, Philippines</span>
               </li>
               <li className="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-colors">
                 <Phone size={16} className="text-green-500 flex-shrink-0" />
-                <a href="tel:+6332123456" className="cursor-pointer">+63 (32) 123-4567</a>
+                <a href="tel:+6332123456" className="cursor-pointer">09623184926</a>
               </li>
               <li className="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-colors">
                 <Mail size={16} className="text-green-500 flex-shrink-0" />
-                <a href="mailto:info@talisaychamber.org" className="cursor-pointer">info@talisaychamber.org</a>
+                <a href="mailto:info@talisaychamber.org" className="cursor-pointer">talisaychamber@gmail.com</a>
               </li>
             </ul>
 

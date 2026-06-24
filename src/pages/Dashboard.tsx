@@ -9,8 +9,9 @@ import { supabase } from "../lib/supabase";
 import { 
   User, Building2, CheckCircle2, Shield, CalendarDays, 
   MapPin, Loader2, ArrowRight, QrCode, Phone, Map, 
-  Globe, Mail, CreditCard, LogOut, Download
+  Globe, Mail, CreditCard, LogOut, Download, Newspaper, Plus, Trash2, Edit2, X
 } from "lucide-react";
+import { uploadImage } from "../lib/storage";
 
 interface PricingPlan {
   id: string;
@@ -46,6 +47,16 @@ interface RegisteredEvent {
   };
 }
 
+const getPlanDisplayName = (type: string | null | undefined): string => {
+  if (!type) return "None";
+  switch (type.toLowerCase()) {
+    case "individual": return "Small";
+    case "sme": return "Medium";
+    case "corporate": return "Large";
+    default: return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+};
+
 const Dashboard: React.FC = () => {
   const { user, profile, loading, logout, refetchProfile, isAdmin } = useAuth();
   const { toast } = useNotification();
@@ -75,12 +86,32 @@ const Dashboard: React.FC = () => {
   const [dirWeb, setDirWeb] = useState("");
   const [dirCat, setDirCat] = useState("");
   const [dirAddress, setDirAddress] = useState("");
+  const [approvalStatus, setApprovalStatus] = useState<"approved" | "pending_approval">("approved");
   
   // Loader and query states
   const [actionLoading, setActionLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [registeredEvents, setRegisteredEvents] = useState<RegisteredEvent[]>([]);
-  const [activeTab, setActiveTab] = useState<"card" | "events" | "directory">("card");
+  const [activeTab, setActiveTab] = useState<"card" | "events" | "directory" | "news">("card");
+
+  // Renewal states
+  const [hasPendingRenewal, setHasPendingRenewal] = useState(false);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [renewalPlan, setRenewalPlan] = useState<PricingPlan | null>(null);
+  const [renewalPaymentMethod, setRenewalPaymentMethod] = useState("");
+  const [renewalPaymentRef, setRenewalPaymentRef] = useState("");
+  const [renewalSelectedPayment, setRenewalSelectedPayment] = useState<PaymentQR | null>(null);
+
+  // News Submission states
+  const [myNews, setMyNews] = useState<any[]>([]);
+  const [showNewsSubmitModal, setShowNewsSubmitModal] = useState(false);
+  const [editingNews, setEditingNews] = useState<any | null>(null);
+  const [newsTitle, setNewsTitle] = useState("");
+  const [newsSummary, setNewsSummary] = useState("");
+  const [newsContent, setNewsContent] = useState("");
+  const [newsCategory, setNewsCategory] = useState("General");
+  const [newsImg, setNewsImg] = useState("");
+  const [newsImgFile, setNewsImgFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -139,22 +170,28 @@ const Dashboard: React.FC = () => {
       if (eventsData) setRegisteredEvents(eventsData as any);
 
       // 4. Check if directory listing already exists
-      const { data: dirData } = await supabase
+      const { data: dirDataList } = await supabase
         .from("business_directory")
         .select("*")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .limit(1);
+
+      const dirData = dirDataList && dirDataList.length > 0 ? dirDataList[0] : null;
 
       if (dirData) {
         setHasListing(true);
         setListingId(dirData.id);
-        setDirName(dirData.business_name);
-        setDirDesc(dirData.description);
-        setDirEmail(dirData.contact_email || "");
-        setDirPhone(dirData.contact_phone || "");
-        setDirWeb(dirData.website_url || "");
-        setDirCat(dirData.category);
-        setDirAddress(dirData.address);
+        const isPending = dirData.approval_status === "pending_approval" && dirData.pending_changes;
+        const displayData = isPending ? dirData.pending_changes : dirData;
+
+        setDirName(displayData.business_name || "");
+        setDirDesc(displayData.description || "");
+        setDirEmail(displayData.contact_email || "");
+        setDirPhone(displayData.contact_phone || "");
+        setDirWeb(displayData.website_url || "");
+        setDirCat(displayData.category || "");
+        setDirAddress(displayData.address || "");
+        setApprovalStatus(dirData.approval_status || "approved");
       } else {
         // Prefill directory fields with profile data if available
         setDirName(profile?.company_name || "");
@@ -162,7 +199,25 @@ const Dashboard: React.FC = () => {
         setDirEmail(profile?.email || "");
         setDirCat(profile?.business_category || "");
         setDirAddress(profile?.business_address || "");
+        setApprovalStatus("approved");
       }
+
+      // 5. Fetch user's news submissions
+      const { data: newsData } = await supabase
+        .from("news")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (newsData) setMyNews(newsData);
+
+      // 6. Check if renewal/membership application is pending
+      const { data: pendingApp } = await supabase
+        .from("membership_applications")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .limit(1);
+      setHasPendingRenewal(!!(pendingApp && pendingApp.length > 0));
     };
 
     loadData();
@@ -237,6 +292,50 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Submit Renewal Payment Application
+  const handleRenewalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !user) return;
+    const planToRenew = renewalPlan || plans.find(p => p.type === profile.membership_type);
+    if (!planToRenew) {
+      toast.error("Please select a membership plan for renewal.");
+      return;
+    }
+    if (!renewalPaymentRef) {
+      toast.error("Please fill in your payment reference number.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error: appError } = await supabase
+        .from("membership_applications")
+        .insert({
+          user_id: user.id,
+          membership_type: planToRenew.type,
+          company_name: profile.company_name,
+          business_category: profile.business_category,
+          phone: profile.phone,
+          business_address: profile.business_address,
+          payment_method: renewalPaymentMethod || (paymentMethods.length > 0 ? (paymentMethods[0].name.toLowerCase().includes("gcash") ? "gcash" : "bank_transfer") : "gcash"),
+          payment_reference: renewalPaymentRef,
+          status: "pending",
+          payment_status: "pending",
+        });
+
+      if (appError) throw appError;
+
+      setHasPendingRenewal(true);
+      setShowRenewalModal(false);
+      setRenewalPaymentRef("");
+      toast.success("Renewal payment reference submitted! Our admin team will verify it soon.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit renewal application.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Create or Update Business Directory Listing
   const handleSaveDirectoryListing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,38 +350,147 @@ const Dashboard: React.FC = () => {
     setFormError(null);
 
     try {
-      const listingData = {
-        user_id: user.id,
-        business_name: dirName,
-        description: dirDesc,
-        contact_email: dirEmail,
-        contact_phone: dirPhone,
-        website_url: dirWeb,
-        category: dirCat,
-        address: dirAddress,
-      };
-
       if (hasListing && listingId) {
+        const listingData = {
+          pending_changes: {
+            business_name: dirName,
+            description: dirDesc,
+            contact_email: dirEmail,
+            contact_phone: dirPhone,
+            website_url: dirWeb,
+            category: dirCat,
+            address: dirAddress,
+          },
+          approval_status: "pending_approval",
+        };
+
         const { error } = await supabase
           .from("business_directory")
           .update(listingData)
           .eq("id", listingId);
         if (error) throw error;
+        
+        setApprovalStatus("pending_approval");
+        toast.success("Proposed edits submitted for administrator approval!");
       } else {
-        const { data, error } = await supabase
-          .from("business_directory")
-          .insert(listingData)
-          .select()
-          .single();
-        if (error) throw error;
-        if (data) {
-          setHasListing(true);
-          setListingId(data.id);
-        }
+        setFormError("Under the new Chamber policy, only administrators can register new business listings. Please contact support.");
       }
-      toast.success("Business Directory Listing saved successfully!");
     } catch (err: any) {
       setFormError(err.message || "Failed to save directory listing.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const resetNewsForm = () => {
+    setNewsTitle("");
+    setNewsSummary("");
+    setNewsContent("");
+    setNewsCategory("General");
+    setNewsImg("");
+    setNewsImgFile(null);
+    setEditingNews(null);
+  };
+
+  const handleSaveNewsSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !profile) return;
+    if (!newsTitle.trim() || !newsSummary.trim() || !newsContent.trim()) {
+      setFormError("Please fill in all required fields.");
+      return;
+    }
+
+    setActionLoading(true);
+    setFormError(null);
+
+    try {
+      let finalImgUrl = newsImg;
+      if (newsImgFile) {
+        finalImgUrl = await uploadImage(newsImgFile, "news");
+      }
+
+      const wordCount = newsContent.trim().split(/\s+/).length;
+      const readTimeVal = `${Math.max(1, Math.round(wordCount / 200))} min`;
+
+      const newsData = {
+        title: newsTitle.trim(),
+        summary: newsSummary.trim(),
+        content: newsContent.trim(),
+        category: newsCategory,
+        image_url: finalImgUrl || "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=700&auto=format&fit=crop",
+        author: profile.full_name || "Chamber Member",
+        user_id: user.id,
+        status: "pending",
+        read_time: readTimeVal
+      };
+
+      if (editingNews) {
+        if (editingNews.status !== "pending") {
+          throw new Error("You can only edit articles that are pending approval.");
+        }
+        const { error } = await supabase
+          .from("news")
+          .update(newsData)
+          .eq("id", editingNews.id);
+        if (error) throw error;
+        toast.success("News submission updated successfully!");
+      } else {
+        const { error } = await supabase
+          .from("news")
+          .insert(newsData);
+        if (error) throw error;
+        toast.success("News article submitted for review!");
+      }
+
+      setShowNewsSubmitModal(false);
+      resetNewsForm();
+      
+      const { data: updatedNews } = await supabase
+        .from("news")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (updatedNews) setMyNews(updatedNews);
+
+    } catch (err: any) {
+      setFormError(err.message || "Failed to submit news article.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditNewsClick = (item: any) => {
+    if (item.status !== "pending") {
+      toast.error("You can only edit submissions that are pending review.");
+      return;
+    }
+    setEditingNews(item);
+    setNewsTitle(item.title);
+    setNewsSummary(item.summary);
+    setNewsContent(item.content);
+    setNewsCategory(item.category);
+    setNewsImg(item.image_url || "");
+    setNewsImgFile(null);
+    setShowNewsSubmitModal(true);
+  };
+
+  const handleDeleteNewsSubmission = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this submission?");
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("news")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user?.id || "");
+      if (error) throw error;
+
+      toast.success("Submission deleted.");
+      setMyNews(prev => prev.filter(n => n.id !== id));
+    } catch (err: any) {
+      toast.error("Failed to delete submission: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -315,6 +523,21 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
+
+  const checkNearExpiration = () => {
+    if (!profile?.expires_at) return { isNear: false, isExpired: false, daysLeft: 0 };
+    const expiry = new Date(profile.expires_at);
+    const now = new Date();
+    const diffTime = expiry.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      isNear: diffDays <= 30,
+      isExpired: diffDays <= 0,
+      daysLeft: diffDays
+    };
+  };
+
+  const { isNear: isNearExp, isExpired: isExpiredExp, daysLeft: daysLeftExp } = checkNearExpiration();
 
   return (
     <div className="min-h-screen bg-[#fbfaf6] pt-32 pb-24 px-4 md:px-8 max-w-7xl mx-auto">
@@ -564,12 +787,12 @@ const Dashboard: React.FC = () => {
             </div>
             <h2 className="text-2xl font-heading font-black text-gray-900 mb-3">Application Under Review</h2>
             <p className="text-gray-500 text-sm leading-relaxed max-w-md mb-8">
-              We received your application for the <span className="font-semibold text-green-700 capitalize">{profile.membership_type}</span> membership. Our administrative officers are validating your payment reference. This usually takes between 12 to 24 hours.
+              We received your application for the <span className="font-semibold text-green-700">{getPlanDisplayName(profile.membership_type)}</span> membership. Our administrative officers are validating your payment reference. This usually takes between 12 to 24 hours.
             </p>
             <div className="w-full p-4.5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col sm:flex-row justify-between gap-4 text-xs font-heading font-semibold text-left">
               <div>
                 <div className="text-gray-400">Membership Tier</div>
-                <div className="text-gray-900 mt-1 capitalize">{profile.membership_type} Member</div>
+                <div className="text-gray-900 mt-1">{getPlanDisplayName(profile.membership_type)} Member</div>
               </div>
               <div>
                 <div className="text-gray-400">Reference Account</div>
@@ -612,7 +835,57 @@ const Dashboard: React.FC = () => {
 
       {/* RENDER FULL MEMBER CONTROLS (IF STATUS IS ACTIVE) */}
       {profile?.membership_status === "active" && (
-        <div className="grid lg:grid-cols-[280px_1fr] gap-8 items-start">
+        <div className="flex flex-col gap-6">
+          {/* Expiration warning banner */}
+          {isNearExp && (
+            <div className={`p-5 rounded-[2rem] border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm text-xs font-semibold ${
+              isExpiredExp 
+                ? "bg-red-50 border-red-200 text-red-700" 
+                : "bg-amber-50 border-amber-200 text-amber-800"
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isExpiredExp ? "bg-red-100 text-red-705" : "bg-amber-100 text-amber-705"}`}>
+                  <Shield size={18} />
+                </span>
+                <div className="text-left">
+                  <div className="font-heading font-black text-sm text-gray-900">
+                    {isExpiredExp ? "Membership Expired" : "Membership Expiring Soon"}
+                  </div>
+                  <div className="opacity-90 font-normal mt-0.5 max-w-2xl text-gray-500">
+                    {isExpiredExp 
+                      ? "Your membership has expired. Please submit a renewal payment reference below to reactivate your listing and member news submission privileges."
+                      : `Your membership expires in ${daysLeftExp} days (on ${new Date(profile.expires_at!).toLocaleDateString()}). Renew early to ensure uninterrupted Chamber privileges.`}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                {hasPendingRenewal ? (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20 font-bold uppercase text-[10px] tracking-wider">
+                    <Loader2 size={12} className="animate-spin" /> Renewal Pending Verification
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setRenewalPlan(plans.find(p => p.type === profile.membership_type) || null);
+                      if (paymentMethods.length > 0) {
+                        setRenewalSelectedPayment(paymentMethods[0]);
+                        setRenewalPaymentMethod(paymentMethods[0].name.toLowerCase().includes("gcash") ? "gcash" : "bank_transfer");
+                      }
+                      setShowRenewalModal(true);
+                    }}
+                    className={`px-4.5 py-2.5 rounded-xl text-white font-bold cursor-pointer transition-colors shadow-diffuse text-xs ${
+                      isExpiredExp ? "bg-red-700 hover:bg-red-600" : "bg-amber-600 hover:bg-amber-500"
+                    }`}
+                  >
+                    Renew Membership
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid lg:grid-cols-[280px_1fr] gap-8 items-start">
           {/* Sidebar tabs */}
           <div className="bg-white rounded-2xl p-4.5 border border-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.02)] space-y-1">
             <button
@@ -645,6 +918,16 @@ const Dashboard: React.FC = () => {
             >
               <Building2 size={16} /> Business Directory Profile
             </button>
+            <button
+              onClick={() => setActiveTab("news")}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-3 transition-colors ${
+                activeTab === "news"
+                  ? "bg-green-700 text-white shadow-diffuse"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-green-700"
+              }`}
+            >
+              <Newspaper size={16} /> News Submissions ({myNews.length})
+            </button>
           </div>
 
           {/* Main workspace */}
@@ -673,7 +956,7 @@ const Dashboard: React.FC = () => {
                         <span className="font-heading font-black text-xs tracking-wider">TALISAY CHAMBER</span>
                       </div>
                       <span className="text-[9px] font-heading font-bold tracking-widest text-gold bg-gold/15 px-2 py-0.5 rounded-full border border-gold/25 uppercase">
-                        {profile.membership_type}
+                        {getPlanDisplayName(profile.membership_type)}
                       </span>
                     </div>
 
@@ -837,147 +1120,604 @@ const Dashboard: React.FC = () => {
                   exit={{ opacity: 0, y: -10 }}
                   className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.02)]"
                 >
-                  <h2 className="text-xl font-heading font-black text-[#0D1A14] mb-2">
-                    {hasListing ? "Manage Directory Profile" : "Register Business in Directory"}
-                  </h2>
-                  <p className="text-sm text-gray-500 mb-6">
-                    As an active member, you can list your business on the public Talisay Chamber Business Directory.
-                  </p>
+                  {!hasListing ? (
+                    <div className="text-center py-12 px-6 flex flex-col items-center max-w-lg mx-auto">
+                      <div className="w-16 h-16 bg-green-50 border border-green-100 text-green-700 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                        <Building2 size={28} />
+                      </div>
+                      <h3 className="font-heading font-black text-xl text-gray-900 mb-3">Directory Listing Pending</h3>
+                      <p className="text-gray-505 text-sm leading-relaxed mb-6">
+                        Under Chamber policies, directory listings must be initially set up by an administrator. 
+                        Once created, you will be able to edit and update your business profile from this tab.
+                      </p>
+                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-xs text-gray-400 font-semibold w-full text-center">
+                        Please contact the Chamber Admin to create your business directory profile.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="text-xl font-heading font-black text-[#0D1A14] mb-2">
+                        Manage Directory Profile
+                      </h2>
+                      <p className="text-sm text-gray-500 mb-6">
+                        Update your business information on the public Talisay Chamber Business Directory.
+                      </p>
 
-                  {formError && (
-                    <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                      {formError}
+                      {approvalStatus === "pending_approval" && (
+                        <div className="mb-6 p-4 bg-amber-50/70 border border-amber-200/60 text-amber-905 rounded-2xl flex items-start gap-3 shadow-[0_2px_10px_rgba(245,158,11,0.02)] text-left">
+                          <div className="p-1.5 bg-amber-105 rounded-xl text-amber-700 mt-0.5">
+                            <Shield size={16} className="animate-pulse" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold font-heading text-amber-800">Proposed Edits Pending Review</h4>
+                            <p className="text-[11px] text-amber-700/80 leading-relaxed mt-0.5">
+                              You have made changes to your directory profile that are currently waiting for admin approval. 
+                              While review is pending, the directory page displays your last approved information. 
+                              You can continue to modify your draft edits below.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {formError && (
+                        <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+                          {formError}
+                        </div>
+                      )}
+
+                      <form onSubmit={handleSaveDirectoryListing} className="space-y-4">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Business Name *</label>
+                            <div className="relative">
+                              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Santos Trading Co."
+                                value={dirName}
+                                onChange={(e) => setDirName(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Category *</label>
+                            <select
+                              required
+                              value={dirCat}
+                              onChange={(e) => setDirCat(e.target.value)}
+                              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                            >
+                              <option value="">Select Category</option>
+                              <option value="Retail">Retail</option>
+                              <option value="Construction">Construction</option>
+                              <option value="Food & Beverage">Food & Beverage</option>
+                              <option value="Professional Services">Professional Services</option>
+                              <option value="Healthcare">Healthcare</option>
+                              <option value="IT & Tech">IT & Tech</option>
+                              <option value="Logistics">Logistics</option>
+                              <option value="Agriculture">Agriculture</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Business Description *</label>
+                          <textarea
+                            required
+                            rows={4}
+                            placeholder="Tell us what your business does..."
+                            value={dirDesc}
+                            onChange={(e) => setDirDesc(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all resize-none"
+                          />
+                        </div>
+
+                        <div className="grid sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Contact Email</label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                              <input
+                                type="email"
+                                placeholder="sales@company.com"
+                                value={dirEmail}
+                                onChange={(e) => setDirEmail(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Contact Phone</label>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                              <input
+                                type="text"
+                                placeholder="(032) 234-5678"
+                                value={dirPhone}
+                                onChange={(e) => setDirPhone(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Website URL</label>
+                            <div className="relative">
+                              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                              <input
+                                type="text"
+                                placeholder="www.company.com"
+                                value={dirWeb}
+                                onChange={(e) => setDirWeb(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Physical Address *</label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                            <input
+                              type="text"
+                              required
+                              placeholder="Barangay, City/Province"
+                              value={dirAddress}
+                              onChange={(e) => setDirAddress(e.target.value)}
+                              className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={actionLoading}
+                          className="btn-premium bg-green-700 hover:bg-green-600 text-white shadow-diffuse text-xs"
+                        >
+                          {actionLoading ? (
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 size={13} className="animate-spin" /> Saving...
+                            </span>
+                          ) : (
+                            "Save Proposed Edits"
+                          )}
+                        </button>
+                      </form>
+                    </>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Tab 4: News Submissions */}
+              {activeTab === "news" && (
+                <motion.div
+                  key="news"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-[0_4px_30px_rgba(0,0,0,0.02)]"
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                      <h2 className="text-xl font-heading font-black text-[#0D1A14] mb-1 text-left">
+                        News & Announcement Submissions
+                      </h2>
+                      <p className="text-sm text-gray-500 text-left">
+                        Submit articles, updates, or announcements to be featured on the Chamber News wall.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        resetNewsForm();
+                        setFormError(null);
+                        setShowNewsSubmitModal(true);
+                      }}
+                      className="flex items-center gap-1.5 px-4.5 py-2.5 rounded-full bg-green-700 hover:bg-green-600 text-white text-xs font-bold transition-all shadow-diffuse cursor-pointer self-start sm:self-auto"
+                    >
+                      <Plus size={14} /> Submit Article
+                    </button>
+                  </div>
+
+                  {myNews.length === 0 ? (
+                    <div className="text-center py-12 px-6 flex flex-col items-center">
+                      <Newspaper className="mx-auto h-12 w-12 text-gray-305 mb-4" />
+                      <h4 className="font-heading font-semibold text-gray-900">No submissions yet</h4>
+                      <p className="text-sm text-gray-500 mt-1 max-w-[32ch] mx-auto">
+                        Share your company's milestones, announcements, or press releases with the Chamber network.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100 text-gray-400 font-bold uppercase tracking-wider">
+                            <th className="pb-3.5 pl-2">Title</th>
+                            <th className="pb-3.5">Category</th>
+                            <th className="pb-3.5">Submission Date</th>
+                            <th className="pb-3.5">Status</th>
+                            <th className="pb-3.5 text-right pr-2">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 font-semibold text-gray-700">
+                          {myNews.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50/40">
+                              <td className="py-4 pl-2 max-w-[200px] text-left">
+                                <div className="text-gray-900 font-bold truncate" title={item.title}>{item.title}</div>
+                                <div className="text-[10px] text-gray-400 font-normal truncate mt-0.5" title={item.summary}>{item.summary}</div>
+                              </td>
+                              <td className="py-4 text-left">{item.category}</td>
+                              <td className="py-4 text-left text-gray-400 font-normal">
+                                {new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              </td>
+                              <td className="py-4 text-left">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                                  item.status === "approved"
+                                    ? "bg-green-50 text-green-700 border-green-100"
+                                    : item.status === "rejected"
+                                    ? "bg-red-50 text-red-700 border-red-100"
+                                    : "bg-amber-50 text-amber-700 border-amber-100 animate-pulse"
+                                }`}>
+                                  {item.status === "pending" ? "Pending Review" : item.status}
+                                </span>
+                              </td>
+                              <td className="py-4 text-right pr-2">
+                                <div className="flex items-center justify-end gap-1">
+                                  {item.status === "pending" && (
+                                    <>
+                                      <button
+                                        onClick={() => handleEditNewsClick(item)}
+                                        className="p-1 text-gray-400 hover:text-green-700 cursor-pointer"
+                                        title="Edit Draft"
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteNewsSubmission(item.id)}
+                                        className="p-1 text-gray-400 hover:text-red-700 cursor-pointer"
+                                        title="Delete Submission"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </>
+                                  )}
+                                  {item.status !== "pending" && (
+                                    <span className="text-[10px] text-gray-300 font-normal italic pr-2">Locked</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
-
-                  <form onSubmit={handleSaveDirectoryListing} className="space-y-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Business Name *</label>
-                        <div className="relative">
-                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. Santos Trading Co."
-                            value={dirName}
-                            onChange={(e) => setDirName(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Category *</label>
-                        <select
-                          required
-                          value={dirCat}
-                          onChange={(e) => setDirCat(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                        >
-                          <option value="">Select Category</option>
-                          <option value="Retail">Retail</option>
-                          <option value="Construction">Construction</option>
-                          <option value="Food & Beverage">Food & Beverage</option>
-                          <option value="Professional Services">Professional Services</option>
-                          <option value="Healthcare">Healthcare</option>
-                          <option value="IT & Tech">IT & Tech</option>
-                          <option value="Logistics">Logistics</option>
-                          <option value="Agriculture">Agriculture</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Business Description *</label>
-                      <textarea
-                        required
-                        rows={4}
-                        placeholder="Tell us what your business does..."
-                        value={dirDesc}
-                        onChange={(e) => setDirDesc(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all resize-none"
-                      />
-                    </div>
-
-                    <div className="grid sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Contact Email</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                          <input
-                            type="email"
-                            placeholder="sales@company.com"
-                            value={dirEmail}
-                            onChange={(e) => setDirEmail(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Contact Phone</label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                          <input
-                            type="text"
-                            placeholder="(032) 234-5678"
-                            value={dirPhone}
-                            onChange={(e) => setDirPhone(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Website URL</label>
-                        <div className="relative">
-                          <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                          <input
-                            type="text"
-                            placeholder="www.company.com"
-                            value={dirWeb}
-                            onChange={(e) => setDirWeb(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Physical Address *</label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                        <input
-                          type="text"
-                          required
-                          placeholder="Barangay, City/Province"
-                          value={dirAddress}
-                          onChange={(e) => setDirAddress(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={actionLoading}
-                      className="btn-premium bg-green-700 hover:bg-green-600 text-white shadow-diffuse text-xs"
-                    >
-                      {actionLoading ? (
-                        <span className="flex items-center gap-1.5">
-                          <Loader2 size={13} className="animate-spin" /> Saving...
-                        </span>
-                      ) : (
-                        "Save Directory Profile"
-                      )}
-                    </button>
-                  </form>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
+      </div>
       )}
+
+      {/* MEMBER NEWS SUBMISSION MODAL */}
+      <AnimatePresence>
+        {showNewsSubmitModal && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh] text-left relative"
+            >
+              <button
+                onClick={() => {
+                  setShowNewsSubmitModal(false);
+                  resetNewsForm();
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <h3 className="text-xl font-heading font-black text-gray-900 mb-2">
+                {editingNews ? "Edit News Submission" : "Submit News Article"}
+              </h3>
+              <p className="text-xs text-gray-500 mb-6">
+                Fill in the details below to submit an article. Submissions are subject to administrator approval before being published.
+              </p>
+
+              {formError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveNewsSubmission} className="space-y-4 text-xs font-semibold text-gray-700">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Article Title *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Santos Trading expands local retail lines"
+                      value={newsTitle}
+                      onChange={(e) => setNewsTitle(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Category *</label>
+                    <select
+                      value={newsCategory}
+                      onChange={(e) => setNewsCategory(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
+                    >
+                      <option value="General">General</option>
+                      <option value="Partnership">Partnership</option>
+                      <option value="Economic News">Economic News</option>
+                      <option value="Membership">Membership</option>
+                      <option value="Event">Event</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Summary * (Short Teaser Description)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Provide a one-sentence teaser description..."
+                    value={newsSummary}
+                    onChange={(e) => setNewsSummary(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Full Article Content *</label>
+                  <textarea
+                    required
+                    rows={6}
+                    placeholder="Write the full body content of your news article here..."
+                    value={newsContent}
+                    onChange={(e) => setNewsContent(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-950 outline-none focus:bg-white focus:border-green-500 transition-all resize-none font-sans leading-relaxed"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Banner Image</label>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-3 bg-gray-50 hover:bg-gray-100 transition-all relative min-h-[96px]">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setNewsImgFile(file);
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className="text-center pointer-events-none">
+                        <Plus className="mx-auto text-gray-400 mb-1" size={18} />
+                        <span className="text-[10px] text-gray-600 font-bold block">
+                          {newsImgFile ? newsImgFile.name : "Upload Image File"}
+                        </span>
+                        <span className="text-[9px] text-gray-400 block mt-0.5">PNG, JPG up to 5MB</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={newsImg}
+                        onChange={(e) => setNewsImg(e.target.value)}
+                        placeholder="Or paste image URL..."
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all"
+                      />
+                      <div className="flex-1 min-h-[64px] border border-gray-100 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center text-[10px] text-gray-400 relative">
+                        {newsImgFile ? (
+                          <img
+                            src={URL.createObjectURL(newsImgFile)}
+                            alt="Upload Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : newsImg ? (
+                          <img
+                            src={newsImg}
+                            alt="URL Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <span>Image Preview</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 pt-4 border-t border-gray-100 mt-6">
+                  <button
+                    type="submit"
+                    disabled={actionLoading}
+                    className="flex-1 py-3 rounded-xl bg-green-700 hover:bg-green-600 text-white font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-diffuse text-xs"
+                  >
+                    {actionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} /> Submitting...
+                      </>
+                    ) : (
+                      editingNews ? "Update Submission" : "Submit Article"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewsSubmitModal(false);
+                      resetNewsForm();
+                    }}
+                    className="px-4 py-3 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-500 cursor-pointer text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* RENEWAL MODAL */}
+      <AnimatePresence>
+        {showRenewalModal && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh] text-left relative"
+            >
+              <button
+                onClick={() => setShowRenewalModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <h3 className="text-xl font-heading font-black text-gray-900 mb-2">
+                Renew Chamber Membership
+              </h3>
+              <p className="text-xs text-gray-500 mb-6">
+                Submit your renewal payment details below. Once verified by the Chamber Admin, your expiration date will be extended by 1 year.
+              </p>
+
+              <form onSubmit={handleRenewalSubmit} className="space-y-4 text-xs font-semibold text-gray-700">
+                {/* 1. Plan display/select */}
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Select Renewal Tier *</label>
+                  <select
+                    value={renewalPlan?.type || ""}
+                    onChange={(e) => {
+                      const selected = plans.find(p => p.type === e.target.value) || null;
+                      setRenewalPlan(selected);
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
+                  >
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.type}>
+                        {p.name} Tier — PHP {Number(p.price).toLocaleString()} / {p.period}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Plan details */}
+                {renewalPlan && (
+                  <div className="p-3.5 rounded-2xl bg-green-50/50 border border-green-100 text-green-800 text-[11px] font-normal leading-relaxed">
+                    <span className="font-heading font-black block mb-0.5">{renewalPlan.name} Plan Description:</span>
+                    {renewalPlan.description}
+                  </div>
+                )}
+
+                {/* Payment method selector */}
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1.5">Payment Method *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {paymentMethods.map((pay) => (
+                      <button
+                        key={pay.id}
+                        type="button"
+                        onClick={() => {
+                          setRenewalSelectedPayment(pay);
+                          setRenewalPaymentMethod(pay.name.toLowerCase().includes("gcash") ? "gcash" : "bank_transfer");
+                        }}
+                        className={`p-3 rounded-2xl border text-center font-bold transition-all cursor-pointer ${
+                          renewalSelectedPayment?.id === pay.id
+                            ? "bg-green-50 border-green-500 text-green-700 ring-2 ring-green-500/10"
+                            : "border-gray-200 hover:bg-gray-50 text-gray-600"
+                        }`}
+                      >
+                        {pay.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* QR code and payment instructions */}
+                {renewalSelectedPayment && (
+                  <div className="p-4 rounded-2xl bg-gray-50 border border-gray-150 space-y-3">
+                    <div className="flex items-start gap-4">
+                      {renewalSelectedPayment.qr_code_url && (
+                        <div className="w-20 h-20 bg-white border border-gray-200 rounded-xl overflow-hidden flex items-center justify-center p-1 flex-shrink-0">
+                          <img
+                            src={renewalSelectedPayment.qr_code_url}
+                            alt="QR Payment"
+                            className="object-contain w-full h-full"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-heading font-bold text-gray-900 text-[11px]">Payment Instructions:</div>
+                        <p className="text-[10px] text-gray-500 mt-1 leading-normal font-normal">
+                          {renewalSelectedPayment.payment_instructions}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Transaction Reference Number *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter GCash Ref / Bank Transaction ID"
+                    value={renewalPaymentRef}
+                    onChange={(e) => setRenewalPaymentRef(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
+                  />
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2.5 pt-4 border-t border-gray-100 mt-6">
+                  <button
+                    type="submit"
+                    disabled={actionLoading}
+                    className="flex-1 py-3 rounded-xl bg-green-700 hover:bg-green-600 text-white font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-diffuse text-xs"
+                  >
+                    {actionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} /> Submitting...
+                      </>
+                    ) : (
+                      "Submit Renewal Reference"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRenewalModal(false)}
+                    className="px-4 py-3 border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-500 cursor-pointer text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 export default Dashboard;
+

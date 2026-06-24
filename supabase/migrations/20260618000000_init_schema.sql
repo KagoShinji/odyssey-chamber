@@ -2,23 +2,6 @@
 -- This file contains the complete SQL script to set up your Supabase project database.
 -- Paste this script directly into the Supabase SQL Editor and run it.
 
--- =========================================================================
--- OPTIONAL RESET SECTION
--- If you already ran this script once and want to reset/re-run the whole file,
--- uncomment the lines below (remove the "-- ") and execute it:
--- =========================================================================
--- drop table if exists public.business_directory cascade;
--- drop table if exists public.news cascade;
--- drop table if exists public.event_registrations cascade;
--- drop table if exists public.events cascade;
--- drop table if exists public.membership_applications cascade;
--- drop table if exists public.qr_settings cascade;
--- drop table if exists public.membership_pricing cascade;
--- drop table if exists public.profiles cascade;
--- drop trigger if exists on_auth_user_created on auth.users cascade;
--- drop function if exists public.handle_new_user() cascade;
--- drop function if exists public.is_admin() cascade;
-
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
@@ -399,18 +382,7 @@ insert into public.business_directory (business_name, description, contact_email
 ('Cebu South Logistics', 'Fast and secure shipping, warehousing, and inventory fulfillment services for Cebu businesses.', 'operations@cebusouth.ph', '(032) 890-1234', 'cebusouth.ph', 'Logistics', 'Tank, Talisay City', false, true),
 ('Green Earth Agri-Farm', 'Sustainable farm producing fresh organic vegetables, poultry, and farming consulting services.', 'farm@greenearth.ph', '(032) 901-2345', 'greenearth.ph', 'Agriculture', 'Camp 4, Talisay City', false, true);
 
-
--- =========================================================================
--- HOW TO PROMOTE A USER TO ADMIN:
--- Run this query substituting your signed-up user''s email:
--- UPDATE public.profiles SET role = 'admin' WHERE email = 'admin@example.com';
--- =========================================================================
-
--- =========================================================================
--- STORAGE BUCKETS & POLICIES FOR UPLOADS
--- =========================================================================
-
--- Insert the public bucket if not exists
+-- 6. Storage Bucket Configuration
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'chamber-assets', 
@@ -421,70 +393,21 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Public read access to objects in chamber-assets
 CREATE POLICY "Public Read Access on Chamber Assets"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'chamber-assets');
 
--- Allow authenticated users to upload objects to chamber-assets
 CREATE POLICY "Authenticated Insert Access on Chamber Assets"
   ON storage.objects FOR INSERT
   TO authenticated
   WITH CHECK (bucket_id = 'chamber-assets');
 
--- Allow authenticated users to update/overwrite objects in chamber-assets
 CREATE POLICY "Authenticated Update Access on Chamber Assets"
   ON storage.objects FOR UPDATE
   TO authenticated
   WITH CHECK (bucket_id = 'chamber-assets');
 
--- Allow authenticated users to delete objects in chamber-assets
 CREATE POLICY "Authenticated Delete Access on Chamber Assets"
   ON storage.objects FOR DELETE
   TO authenticated
   USING (bucket_id = 'chamber-assets');
-
--- Migration: Add non-member price column to events table
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS non_member_price numeric default 0 not null check (non_member_price >= 0);
-
--- Migration: Add is_archived column to events table
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS is_archived boolean default false not null;
-
--- Migration: Add pending_changes and approval_status columns to business_directory table
-ALTER TABLE public.business_directory ADD COLUMN IF NOT EXISTS pending_changes jsonb default null;
-ALTER TABLE public.business_directory ADD COLUMN IF NOT EXISTS approval_status text default 'approved' check (approval_status in ('approved', 'pending_approval'));
-
--- Migration: Add user_id and status columns to news table and update RLS policies
-ALTER TABLE public.news ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
-ALTER TABLE public.news ADD COLUMN IF NOT EXISTS status text DEFAULT 'approved' CHECK (status in ('pending', 'approved', 'rejected'));
-
-DROP POLICY IF EXISTS "News is viewable by everyone" ON public.news;
-DROP POLICY IF EXISTS "News is manageable by admins only" ON public.news;
-
-CREATE POLICY "Viewable approved news by everyone, pending/rejected by owner or admin"
-  ON public.news FOR SELECT
-  USING (status = 'approved' OR auth.uid() = user_id OR is_admin());
-
-CREATE POLICY "Members can submit pending news, admins can insert any"
-  ON public.news FOR INSERT
-  TO authenticated
-  WITH CHECK ((auth.uid() = user_id AND status = 'pending') OR is_admin());
-
-CREATE POLICY "Members can update their pending news, admins can update any"
-  ON public.news FOR UPDATE
-  TO authenticated
-  USING ((auth.uid() = user_id AND status = 'pending') OR is_admin())
-  WITH CHECK ((auth.uid() = user_id AND status = 'pending') OR is_admin());
-
-CREATE POLICY "Members can delete their pending news, admins can delete any"
-  ON public.news FOR DELETE
-  TO authenticated
-  USING ((auth.uid() = user_id AND status = 'pending') OR is_admin());
-
-
--- Migration: Add invoice_number column to event_registrations table
-ALTER TABLE public.event_registrations ADD COLUMN IF NOT EXISTS invoice_number text DEFAULT null;
-
--- Migration: Add invoice_number column to membership_applications table
-ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS invoice_number text DEFAULT null;
-

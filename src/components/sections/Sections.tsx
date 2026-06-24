@@ -23,7 +23,7 @@ const spring: Variants = {
 export const AboutSection: React.FC = () => (
   <section className="py-32 section-shell" aria-label="About the Chamber">
     <div className="container mx-auto px-4 md:px-10 max-w-7xl">
-      {/* Left-aligned header  breaks center bias */}
+      {/* Left-aligned header */}
       <div className="max-w-2xl mb-16">
         <motion.span
           custom={0} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
@@ -42,18 +42,21 @@ export const AboutSection: React.FC = () => (
       {/* Asymmetric grid: 55/45 */}
       <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-14 items-start">
 
-        {/* Left: prose + buttons */}
+        {/* Left: prose + We Connect / Support / Advocate */}
         <div>
           <motion.p custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="text-[1.0625rem] text-gray-600 mb-4 leading-[1.8] max-w-[58ch]">
-            The City of Talisay Chamber of Commerce, Trade and Industry Inc. is the premier
-            business networking organization dedicated to fostering economic vitality and
-            supporting local enterprises since 1998.
+            Talisay Chamber is a dedicated community of local entrepreneurs, committed to fostering growth,
+            collaboration, and success within our region. We champion the interests of small businesses,
+            providing vital resources and creating opportunities for networking and professional development.
           </motion.p>
           <motion.p custom={3} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="text-gray-500 mb-4 leading-[1.8] max-w-[58ch]">
+            We believe that robust small businesses are the heartbeat of a thriving community.
+          </motion.p>
+          <motion.p custom={3.5} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
             className="text-gray-500 mb-10 leading-[1.8] max-w-[58ch]">
-            We bridge the business community and local government, ensuring policies support
-            sustainable growth and innovation across every industry in Talisay.
+            Join us to connect, gain support, and advocate for a stronger local economy.
           </motion.p>
 
           {/* Stat row */}
@@ -71,42 +74,103 @@ export const AboutSection: React.FC = () => (
             ))}
           </motion.div>
 
-          <motion.div custom={5} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="flex gap-3">
-            <button className="btn-premium bg-[#0D1A14] hover:bg-navy-mid text-white shadow-navy-diffuse hover:-translate-y-0.5">
-              Our History
-              <span className="btn-icon-wrap !bg-white/10"><ArrowUpRight size={13} /></span>
-            </button>
-            <Button variant="ghost" className="rounded-full h-12 px-6 text-green-700 hover:bg-green-50 font-heading font-semibold cursor-pointer spring-fast">
-              Meet the Board
-            </Button>
-          </motion.div>
+          {/* We Connect / We Support / We Advocate */}
+          <div className="space-y-6">
+            {[
+              {
+                label: "We Connect",
+                text: "We facilitate connections between businesses, customers, and community leaders through events, workshops, and online platforms.",
+              },
+              {
+                label: "We Support",
+                text: "We offer a range of resources, from educational programs to business tools and mentorship opportunities, to help our members overcome challenges and achieve their goals.",
+              },
+              {
+                label: "We Advocate",
+                text: "We are the voice of small businesses, working with local government and organizations to create a favorable environment for our members to flourish.",
+              },
+            ].map(({ label, text }, i) => (
+              <motion.div
+                key={label}
+                custom={5 + i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                className="flex gap-4"
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <span className="inline-block px-2.5 py-0.5 rounded text-[11px] font-heading font-bold bg-green-700 text-white">
+                    {label}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-sm leading-relaxed">{text}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
-        {/* Right: 22 spotlight cards  equal heights via items-stretch */}
-        <div className="grid sm:grid-cols-2 gap-4 items-stretch">
-          {[
-            { icon: Lightbulb, title: "Our Vision", color: "#166534", bg: "bg-green-50",
-              text: "A progressive, globally competitive, and sustainable business community in Talisay." },
-            { icon: Shield, title: "Our Mission", color: "#17472B", bg: "bg-emerald-50",
-              text: "Empower businesses through advocacy, networking, and strategic partnerships.", offset: true },
-            { icon: Target, title: "Core Values", color: "#9A6216", bg: "bg-amber-50",
-              text: "Integrity, excellence, innovation, collaboration, and community guide everything we do.", offset: false },
-            { icon: Users, title: "Our Goal", color: "#2B3A31", bg: "bg-stone-100",
-              text: "1,000 thriving local businesses by 2030 through programs, mentorship, and linkages.", offset: true },
-          ].map(({ icon: Icon, title, color, bg, text }, i) => (
-            <motion.div
-              key={title}
-              custom={i} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
-              className="spotlight-card p-7 flex flex-col"
-            >
-              <div className={`w-11 h-11 rounded-2xl ${bg} flex items-center justify-center mb-5 flex-shrink-0`} style={{ color }}>
-                <Icon size={20} />
-              </div>
-              <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-2 leading-snug">{title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed flex-1">{text}</p>
-            </motion.div>
-          ))}
+        {/* Right: Vision, Mission, Core Values cards */}
+        <div className="space-y-5">
+          {/* VISION card */}
+          <motion.div
+            custom={2} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="spotlight-card p-8 flex flex-col"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-green-50 flex items-center justify-center mb-5 flex-shrink-0" style={{ color: "#166534" }}>
+              <Lightbulb size={20} />
+            </div>
+            <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-3 leading-snug uppercase tracking-wide">
+              Vision
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              To be the <strong className="text-[#0D1A14]">cornerstone</strong> in economic prosperity,
+              fostering a vibrant community where every business thrives.
+            </p>
+          </motion.div>
+
+          {/* MISSION card */}
+          <motion.div
+            custom={3} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="spotlight-card p-8 flex flex-col"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center mb-5 flex-shrink-0" style={{ color: "#17472B" }}>
+              <Target size={20} />
+            </div>
+            <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-3 leading-snug uppercase tracking-wide">
+              Mission
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              To <strong className="text-[#0D1A14]">empower and unite</strong> all businesses in all sizes
+              through advocacy, education and networking, that will drive growth and community well-being.
+            </p>
+          </motion.div>
+
+          {/* CORE VALUES card */}
+          <motion.div
+            custom={4} variants={spring} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="spotlight-card p-8 flex flex-col"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center mb-5 flex-shrink-0" style={{ color: "#9A6216" }}>
+              <Shield size={20} />
+            </div>
+            <h3 className="font-heading font-bold text-[#0D1A14] text-[1.0625rem] mb-4 leading-snug uppercase tracking-wide">
+              Core Values
+            </h3>
+            <div className="grid grid-cols-2 gap-2.5">
+              {[
+                { label: "Collaboration",  color: "bg-orange-500" },
+                { label: "Inclusivity",    color: "bg-blue-500" },
+                { label: "Innovation",     color: "bg-green-600" },
+                { label: "Sustainability", color: "bg-amber-700" },
+                { label: "Integrity",      color: "bg-yellow-600" },
+                { label: "Community",      color: "bg-yellow-900" },
+              ].map(({ label, color }) => (
+                <div
+                  key={label}
+                  className={`${color} rounded-xl px-3 py-2.5 text-white text-[12px] font-heading font-semibold text-center`}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
@@ -178,7 +242,7 @@ export const ServicesSection: React.FC = () => (
  */
 const plans = [
   {
-    name: "Individual",
+    name: "Small",
     price: "PHP 1,500",
     period: "/yr",
     desc: "For solo entrepreneurs starting their journey.",
@@ -186,20 +250,20 @@ const plans = [
     highlight: false,
   },
   {
-    name: "SME",
+    name: "Medium",
     price: "PHP 5,000",
     period: "/yr",
     desc: "Most popular for growing small and medium businesses.",
-    features: ["All Individual benefits", "Business promotion", "Training & seminars access", "Priority support"],
+    features: ["All Small benefits", "Business promotion", "Training & seminars access", "Priority support"],
     highlight: true,
     badge: "Most Popular",
   },
   {
-    name: "Corporate",
+    name: "Large",
     price: "PHP 15,000",
     period: "/yr",
     desc: "For established corporations seeking maximum visibility.",
-    features: ["All SME benefits", "Board meeting access", "Co-branding rights", "VIP event seating"],
+    features: ["All Medium benefits", "Board meeting access", "Co-branding rights", "VIP event seating"],
     highlight: false,
   },
 ];

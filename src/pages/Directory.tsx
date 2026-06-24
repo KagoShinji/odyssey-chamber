@@ -13,6 +13,9 @@ interface BusinessListing {
   contact_email: string | null;
   website_url: string | null;
   is_verified: boolean;
+  logo_url?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
 }
 
 const fallbackDirectory = [
@@ -27,6 +30,33 @@ const fallbackDirectory = [
 ];
 
 const categories = ["All", "Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"];
+
+/* Inline Facebook SVG icon */
+const FacebookIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="#4267B2">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
+/* Inline Instagram SVG icon */
+const InstagramIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24">
+    <defs>
+      <linearGradient id="ig-card-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#f09433"/>
+        <stop offset="25%" stopColor="#e6683c"/>
+        <stop offset="50%" stopColor="#dc2743"/>
+        <stop offset="75%" stopColor="#cc2366"/>
+        <stop offset="100%" stopColor="#bc1888"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#ig-card-gradient)" d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+  </svg>
+);
+
+/** Normalise a URL entered by admin (may or may not include protocol) */
+const normaliseUrl = (url: string) =>
+  url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
 
 const Directory: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState("All");
@@ -117,9 +147,20 @@ const Directory: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="spotlight-card rounded-[1.5rem] p-6 group flex flex-col"
+                className="spotlight-card rounded-[1.5rem] p-6 group flex flex-col relative overflow-hidden"
               >
-                <div className="mb-4">
+                {/* Business logo — upper right */}
+                {biz.logo_url && (
+                  <div className="absolute top-4 right-4 w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={biz.logo_url}
+                      alt={`${biz.business_name} logo`}
+                      className="w-full h-full object-contain p-1"
+                    />
+                  </div>
+                )}
+
+                <div className={`mb-4 ${biz.logo_url ? "pr-14" : ""}`}>
                   <span className="text-[10px] font-heading font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 mb-3 inline-block">
                     {biz.category}
                   </span>
@@ -145,9 +186,38 @@ const Directory: React.FC = () => {
                   {biz.website_url && (
                     <div className="flex items-center gap-2.5 text-[13px] text-green-700 font-medium mt-1">
                       <Globe size={14} className="text-green-600" /> 
-                      <a href={biz.website_url.startsWith("http") ? biz.website_url : `https://${biz.website_url}`} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
+                      <a href={normaliseUrl(biz.website_url)} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
                         {biz.website_url} <ExternalLink size={10} />
                       </a>
+                    </div>
+                  )}
+
+                  {/* Social links */}
+                  {(biz.facebook_url || biz.instagram_url) && (
+                    <div className="flex items-center gap-3 pt-1">
+                      {biz.facebook_url && (
+                        <a
+                          href={normaliseUrl(biz.facebook_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Facebook page"
+                          className="flex items-center gap-1.5 text-[12px] text-[#4267B2] hover:underline font-medium transition-opacity hover:opacity-80"
+                        >
+                          <FacebookIcon /> Facebook
+                        </a>
+                      )}
+                      {biz.instagram_url && (
+                        <a
+                          href={normaliseUrl(biz.instagram_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Instagram profile"
+                          className="flex items-center gap-1.5 text-[12px] font-medium transition-opacity hover:opacity-80"
+                          style={{ color: "#dc2743" }}
+                        >
+                          <InstagramIcon /> Instagram
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>

@@ -14,6 +14,7 @@ export interface Profile {
   phone: string | null;
   business_address: string | null;
   business_category: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
