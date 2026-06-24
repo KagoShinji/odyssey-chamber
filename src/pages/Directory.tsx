@@ -29,7 +29,7 @@ const fallbackDirectory = [
   { id: "f8", business_name: "Green Earth Agri-Farm", category: "Agriculture", address: "Camp 4, Talisay City", contact_phone: "(032) 901-2345", contact_email: "farm@greenearth.ph", website_url: "greenearth.ph" },
 ];
 
-const categories = ["All", "Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"];
+
 
 /* Inline Facebook SVG icon */
 const FacebookIcon = () => (
@@ -65,6 +65,13 @@ const Directory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const cardsPerPage = 9;
+
+  // Dynamically extract all unique categories from active listings
+  const categories = React.useMemo(() => {
+    const list = listings.map(biz => biz.category).filter(Boolean);
+    const unique = Array.from(new Set(list));
+    return ["All", ...unique.sort((a, b) => a.localeCompare(b))];
+  }, [listings]);
 
   useEffect(() => {
     const fetchDirectory = async () => {
@@ -141,18 +148,18 @@ const Directory: React.FC = () => {
               className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all shadow-sm"
             />
           </div>
-          <div className="flex overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 hide-scrollbar gap-2 flex-1 items-center">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-[13px] font-medium transition-all ${
-                  activeCategory === cat ? "bg-green-700 text-white shadow-diffuse" : "bg-white text-gray-600 border border-gray-200 hover:border-green-300 hover:text-green-700"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="w-full md:w-64">
+            <select
+              value={activeCategory}
+              onChange={(e) => setActiveCategory(e.target.value)}
+              className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm focus:border-green-500 focus:ring-4 focus:ring-green-500/10 outline-none transition-all shadow-sm font-semibold text-gray-700 cursor-pointer"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>
+                  {cat === "All" ? "All Categories / Sectors" : cat}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

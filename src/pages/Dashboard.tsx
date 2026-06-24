@@ -71,7 +71,20 @@ const Dashboard: React.FC = () => {
   
   // Form input states
   const [companyName, setCompanyName] = useState(profile?.company_name || "");
-  const [businessCategory, setBusinessCategory] = useState(profile?.business_category || "");
+  const [businessCategory, setBusinessCategory] = useState(() => {
+    const cat = profile?.business_category || "";
+    if (cat && !["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(cat)) {
+      return "Other";
+    }
+    return cat;
+  });
+  const [otherCategoryText, setOtherCategoryText] = useState(() => {
+    const cat = profile?.business_category || "";
+    if (cat && !["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(cat)) {
+      return cat;
+    }
+    return "";
+  });
   const [businessAddress, setBusinessAddress] = useState(profile?.business_address || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [paymentMethodName, setPaymentMethodName] = useState("");
@@ -86,8 +99,31 @@ const Dashboard: React.FC = () => {
   const [dirPhone, setDirPhone] = useState("");
   const [dirWeb, setDirWeb] = useState("");
   const [dirCat, setDirCat] = useState("");
+  const [dirOtherCatText, setDirOtherCatText] = useState("");
   const [dirAddress, setDirAddress] = useState("");
   const [approvalStatus, setApprovalStatus] = useState<"approved" | "pending_approval">("approved");
+
+  // Sync profile fields when dynamic profile loads
+  useEffect(() => {
+    if (profile) {
+      setCompanyName(profile.company_name || "");
+      setBusinessAddress(profile.business_address || "");
+      setPhone(profile.phone || "");
+      const cat = profile.business_category || "";
+      if (cat) {
+        if (["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(cat)) {
+          setBusinessCategory(cat);
+          setOtherCategoryText("");
+        } else {
+          setBusinessCategory("Other");
+          setOtherCategoryText(cat);
+        }
+      } else {
+        setBusinessCategory("");
+        setOtherCategoryText("");
+      }
+    }
+  }, [profile]);
   
   // Loader and query states
   const [actionLoading, setActionLoading] = useState(false);
@@ -196,7 +232,19 @@ const Dashboard: React.FC = () => {
         setDirEmail(displayData.contact_email || "");
         setDirPhone(displayData.contact_phone || "");
         setDirWeb(displayData.website_url || "");
-        setDirCat(displayData.category || "");
+        const categoryVal = displayData.category || "";
+        if (categoryVal) {
+          if (["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(categoryVal)) {
+            setDirCat(categoryVal);
+            setDirOtherCatText("");
+          } else {
+            setDirCat("Other");
+            setDirOtherCatText(categoryVal);
+          }
+        } else {
+          setDirCat("");
+          setDirOtherCatText("");
+        }
         setDirAddress(displayData.address || "");
         setApprovalStatus(dirData.approval_status || "approved");
       } else {
@@ -204,7 +252,19 @@ const Dashboard: React.FC = () => {
         setDirName(profile?.company_name || "");
         setDirPhone(profile?.phone || "");
         setDirEmail(profile?.email || "");
-        setDirCat(profile?.business_category || "");
+        const categoryVal = profile?.business_category || "";
+        if (categoryVal) {
+          if (["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(categoryVal)) {
+            setDirCat(categoryVal);
+            setDirOtherCatText("");
+          } else {
+            setDirCat("Other");
+            setDirOtherCatText(categoryVal);
+          }
+        } else {
+          setDirCat("");
+          setDirOtherCatText("");
+        }
         setDirAddress(profile?.business_address || "");
         setApprovalStatus("approved");
       }
@@ -260,6 +320,13 @@ const Dashboard: React.FC = () => {
     setActionLoading(true);
     setFormError(null);
 
+    const finalCategory = businessCategory === "Other" ? otherCategoryText.trim() : businessCategory;
+    if (!finalCategory) {
+      setFormError("Please select a business category or specify one.");
+      setActionLoading(false);
+      return;
+    }
+
     try {
       // Upload proof of payment first
       const proofUrl = await uploadImage(appPaymentProofFile, "payment-proofs");
@@ -271,7 +338,7 @@ const Dashboard: React.FC = () => {
           user_id: user.id,
           membership_type: selectedPlan.type,
           company_name: companyName,
-          business_category: businessCategory,
+          business_category: finalCategory,
           phone: phone,
           business_address: businessAddress,
           payment_method: paymentMethodName,
@@ -290,7 +357,7 @@ const Dashboard: React.FC = () => {
           membership_status: "pending",
           membership_type: selectedPlan.type,
           company_name: companyName,
-          business_category: businessCategory,
+          business_category: finalCategory,
           phone: phone,
           business_address: businessAddress,
         })
@@ -373,6 +440,12 @@ const Dashboard: React.FC = () => {
       return;
     }
 
+    const finalDirCategory = dirCat === "Other" ? dirOtherCatText.trim() : dirCat;
+    if (!finalDirCategory) {
+      setFormError("Please select a category or specify one.");
+      return;
+    }
+
     setActionLoading(true);
     setFormError(null);
 
@@ -385,7 +458,7 @@ const Dashboard: React.FC = () => {
             contact_email: dirEmail,
             contact_phone: dirPhone,
             website_url: dirWeb,
-            category: dirCat,
+            category: finalDirCategory,
             address: dirAddress,
           },
           approval_status: "pending_approval",
@@ -725,7 +798,12 @@ const Dashboard: React.FC = () => {
                   <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Business Category</label>
                   <select
                     value={businessCategory}
-                    onChange={(e) => setBusinessCategory(e.target.value)}
+                    onChange={(e) => {
+                      setBusinessCategory(e.target.value);
+                      if (e.target.value !== "Other") {
+                        setOtherCategoryText("");
+                      }
+                    }}
                     className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
                   >
                     <option value="">Select Category</option>
@@ -737,8 +815,23 @@ const Dashboard: React.FC = () => {
                     <option value="IT & Tech">IT & Tech</option>
                     <option value="Logistics">Logistics</option>
                     <option value="Agriculture">Agriculture</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
+
+                {businessCategory === "Other" && (
+                  <div>
+                    <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Specify Sector / Category</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Handicrafts, Aquaculture, etc."
+                      value={otherCategoryText}
+                      onChange={(e) => setOtherCategoryText(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Contact Phone</label>
@@ -1249,7 +1342,12 @@ const Dashboard: React.FC = () => {
                             <select
                               required
                               value={dirCat}
-                              onChange={(e) => setDirCat(e.target.value)}
+                              onChange={(e) => {
+                                setDirCat(e.target.value);
+                                if (e.target.value !== "Other") {
+                                  setDirOtherCatText("");
+                                }
+                              }}
                               className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
                             >
                               <option value="">Select Category</option>
@@ -1261,8 +1359,23 @@ const Dashboard: React.FC = () => {
                               <option value="IT & Tech">IT & Tech</option>
                               <option value="Logistics">Logistics</option>
                               <option value="Agriculture">Agriculture</option>
+                              <option value="Other">Other</option>
                             </select>
                           </div>
+
+                          {dirCat === "Other" && (
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Specify Sector / Category</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Handicrafts, Aquaculture, etc."
+                                value={dirOtherCatText}
+                                onChange={(e) => setDirOtherCatText(e.target.value)}
+                                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
+                              />
+                            </div>
+                          )}
                         </div>
 
                         <div>

@@ -259,6 +259,7 @@ const Admin: React.FC = () => {
   const [dirBizName, setDirBizName] = useState("");
   const [dirDescription, setDirDescription] = useState("");
   const [dirCategory, setDirCategory] = useState("Retail");
+  const [dirOtherCatText, setDirOtherCatText] = useState("");
   const [dirAddress, setDirAddress] = useState("");
   const [dirEmail, setDirEmail] = useState("");
   const [dirPhone, setDirPhone] = useState("");
@@ -1512,6 +1513,7 @@ const Admin: React.FC = () => {
     setDirBizName("");
     setDirDescription("");
     setDirCategory("Retail");
+    setDirOtherCatText("");
     setDirAddress("");
     setDirEmail("");
     setDirPhone("");
@@ -1531,6 +1533,12 @@ const Admin: React.FC = () => {
     e.preventDefault();
     if (!dirBizName || !dirDescription || !dirCategory || !dirAddress) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    const finalDirCategory = dirCategory === "Other" ? dirOtherCatText.trim() : dirCategory;
+    if (!finalDirCategory) {
+      toast.error("Please specify a business category.");
       return;
     }
 
@@ -1554,7 +1562,7 @@ const Admin: React.FC = () => {
       const listingData = {
         business_name: dirBizName.trim(),
         description: dirDescription.trim(),
-        category: dirCategory,
+        category: finalDirCategory,
         address: dirAddress.trim(),
         contact_email: dirEmail.trim() || null,
         contact_phone: dirPhone.trim() || null,
@@ -1660,7 +1668,19 @@ const Admin: React.FC = () => {
     setEditingDir(biz);
     setDirBizName(biz.business_name);
     setDirDescription(biz.description);
-    setDirCategory(biz.category);
+    const cat = biz.category;
+    if (cat) {
+      if (["Retail", "Construction", "Food & Beverage", "Professional Services", "Healthcare", "IT & Tech", "Logistics", "Agriculture"].includes(cat)) {
+        setDirCategory(cat);
+        setDirOtherCatText("");
+      } else {
+        setDirCategory("Other");
+        setDirOtherCatText(cat);
+      }
+    } else {
+      setDirCategory("Retail");
+      setDirOtherCatText("");
+    }
     setDirAddress(biz.address);
     setDirEmail(biz.contact_email || "");
     setDirPhone(biz.contact_phone || "");
@@ -4367,7 +4387,12 @@ const Admin: React.FC = () => {
                     <label className="block text-[#8A9690] mb-1">Category *</label>
                     <select
                       value={dirCategory}
-                      onChange={(e) => setDirCategory(e.target.value)}
+                      onChange={(e) => {
+                        setDirCategory(e.target.value);
+                        if (e.target.value !== "Other") {
+                          setDirOtherCatText("");
+                        }
+                      }}
                       className="w-full px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none focus:border-green-500 transition-colors"
                     >
                       <option value="Retail">Retail</option>
@@ -4378,8 +4403,23 @@ const Admin: React.FC = () => {
                       <option value="IT & Tech">IT & Tech</option>
                       <option value="Logistics">Logistics</option>
                       <option value="Agriculture">Agriculture</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
+                  
+                  {dirCategory === "Other" && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-[#8A9690] mb-1">Specify Sector / Category *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Handicrafts, Aquaculture, etc."
+                        value={dirOtherCatText}
+                        onChange={(e) => setDirOtherCatText(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none focus:border-green-500 transition-colors"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
