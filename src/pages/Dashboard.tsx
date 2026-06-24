@@ -9,7 +9,8 @@ import { supabase } from "../lib/supabase";
 import { 
   User, Building2, CheckCircle2, Shield, CalendarDays, 
   MapPin, Loader2, ArrowRight, QrCode, Phone, Map, 
-  Globe, Mail, CreditCard, LogOut, Download, Newspaper, Plus, Trash2, Edit2, X
+  Globe, Mail, CreditCard, LogOut, Download, Newspaper, Plus, Trash2, Edit2, X,
+  Camera, Upload
 } from "lucide-react";
 import { uploadImage } from "../lib/storage";
 
@@ -101,6 +102,12 @@ const Dashboard: React.FC = () => {
   const [renewalPaymentMethod, setRenewalPaymentMethod] = useState("");
   const [renewalPaymentRef, setRenewalPaymentRef] = useState("");
   const [renewalSelectedPayment, setRenewalSelectedPayment] = useState<PaymentQR | null>(null);
+
+  // Payment proof states
+  const [appPaymentProofFile, setAppPaymentProofFile] = useState<File | null>(null);
+  const [appPaymentProofPreview, setAppPaymentProofPreview] = useState("");
+  const [renewalPaymentProofFile, setRenewalPaymentProofFile] = useState<File | null>(null);
+  const [renewalPaymentProofPreview, setRenewalPaymentProofPreview] = useState("");
 
   // News Submission states
   const [myNews, setMyNews] = useState<any[]>([]);
@@ -245,11 +252,18 @@ const Dashboard: React.FC = () => {
       setFormError("Please fill in your payment reference number.");
       return;
     }
+    if (!appPaymentProofFile) {
+      setFormError("Please upload an image of your payment receipt as proof.");
+      return;
+    }
 
     setActionLoading(true);
     setFormError(null);
 
     try {
+      // Upload proof of payment first
+      const proofUrl = await uploadImage(appPaymentProofFile, "payment-proofs");
+
       // 1. Create membership application
       const { error: appError } = await supabase
         .from("membership_applications")
@@ -262,6 +276,7 @@ const Dashboard: React.FC = () => {
           business_address: businessAddress,
           payment_method: paymentMethodName,
           payment_reference: paymentReference,
+          payment_proof_url: proofUrl,
           status: "pending",
           payment_status: "pending",
         });
@@ -285,6 +300,8 @@ const Dashboard: React.FC = () => {
 
       await refetchProfile();
       setSelectedPlan(null);
+      setAppPaymentProofFile(null);
+      setAppPaymentProofPreview("");
     } catch (err: any) {
       setFormError(err.message || "Failed to submit application.");
     } finally {
@@ -305,9 +322,16 @@ const Dashboard: React.FC = () => {
       toast.error("Please fill in your payment reference number.");
       return;
     }
+    if (!renewalPaymentProofFile) {
+      toast.error("Please upload an image of your payment receipt as proof.");
+      return;
+    }
 
     setActionLoading(true);
     try {
+      // Upload proof of payment first
+      const proofUrl = await uploadImage(renewalPaymentProofFile, "payment-proofs");
+
       const { error: appError } = await supabase
         .from("membership_applications")
         .insert({
@@ -319,6 +343,7 @@ const Dashboard: React.FC = () => {
           business_address: profile.business_address,
           payment_method: renewalPaymentMethod || (paymentMethods.length > 0 ? (paymentMethods[0].name.toLowerCase().includes("gcash") ? "gcash" : "bank_transfer") : "gcash"),
           payment_reference: renewalPaymentRef,
+          payment_proof_url: proofUrl,
           status: "pending",
           payment_status: "pending",
         });
@@ -328,7 +353,9 @@ const Dashboard: React.FC = () => {
       setHasPendingRenewal(true);
       setShowRenewalModal(false);
       setRenewalPaymentRef("");
-      toast.success("Renewal payment reference submitted! Our admin team will verify it soon.");
+      setRenewalPaymentProofFile(null);
+      setRenewalPaymentProofPreview("");
+      toast.success("Renewal payment reference and proof submitted! Our admin team will verify it soon.");
     } catch (err: any) {
       toast.error(err.message || "Failed to submit renewal application.");
     } finally {
@@ -753,6 +780,42 @@ const Dashboard: React.FC = () => {
                       onChange={(e) => setPaymentReference(e.target.value)}
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
                     />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Proof of Payment Image *</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {appPaymentProofPreview ? (
+                        <img src={appPaymentProofPreview} alt="Payment proof preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera size={18} className="text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <label
+                        htmlFor="app-proof-upload"
+                        className="cursor-pointer flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 hover:border-green-500 rounded-xl text-[11px] font-bold text-gray-600 transition-colors w-full"
+                      >
+                        <Upload size={12} />
+                        {appPaymentProofFile ? appPaymentProofFile.name : "Select Receipt Image"}
+                      </label>
+                      <input
+                        id="app-proof-upload"
+                        type="file"
+                        accept="image/*"
+                        required
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setAppPaymentProofFile(file);
+                            setAppPaymentProofPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1685,6 +1748,43 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setRenewalPaymentRef(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 outline-none focus:bg-white focus:border-green-500 transition-all font-semibold"
                   />
+                </div>
+
+                {/* Proof of Payment Upload */}
+                <div>
+                  <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Proof of Payment Image *</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {renewalPaymentProofPreview ? (
+                        <img src={renewalPaymentProofPreview} alt="Renewal proof preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera size={18} className="text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <label
+                        htmlFor="renewal-proof-upload"
+                        className="cursor-pointer flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 hover:border-green-500 rounded-xl text-[11px] font-bold text-gray-600 transition-colors w-full"
+                      >
+                        <Upload size={12} />
+                        {renewalPaymentProofFile ? renewalPaymentProofFile.name : "Select Receipt Image"}
+                      </label>
+                      <input
+                        id="renewal-proof-upload"
+                        type="file"
+                        accept="image/*"
+                        required
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setRenewalPaymentProofFile(file);
+                            setRenewalPaymentProofPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Action buttons */}

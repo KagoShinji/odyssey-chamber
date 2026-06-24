@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, MapPin, Building, Globe, Mail, Phone, ExternalLink, Loader2 } from "lucide-react";
+import { Search, MapPin, Building, Globe, Mail, Phone, ExternalLink, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { CtaSection } from "../components/sections/MoreSections";
 import { supabase } from "../lib/supabase";
 
@@ -63,6 +63,8 @@ const Directory: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [listings, setListings] = useState<BusinessListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const cardsPerPage = 9;
 
   useEffect(() => {
     const fetchDirectory = async () => {
@@ -72,6 +74,7 @@ const Directory: React.FC = () => {
           .from("business_directory")
           .select("*")
           .eq("is_verified", true)
+          .order("is_featured", { ascending: false })
           .order("business_name", { ascending: true });
         if (data && data.length > 0) {
           setListings(data as any);
@@ -89,9 +92,28 @@ const Directory: React.FC = () => {
     fetchDirectory();
   }, []);
 
-  const filtered = listings.filter(biz => 
-    (activeCategory === "All" || biz.category === activeCategory) &&
-    [biz.business_name, biz.category, biz.address].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
+  // Reset page when category or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchQuery]);
+
+  const filtered = listings
+    .filter(biz => 
+      (activeCategory === "All" || biz.category === activeCategory) &&
+      [biz.business_name, biz.category, biz.address].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aFeat = (a as any).is_featured ? 1 : 0;
+      const bFeat = (b as any).is_featured ? 1 : 0;
+      if (aFeat !== bFeat) return bFeat - aFeat;
+      return a.business_name.localeCompare(b.business_name);
+    });
+
+  const totalCards = filtered.length;
+  const totalPages = Math.ceil(totalCards / cardsPerPage) || 1;
+  const paginated = filtered.slice(
+    (currentPage - 1) * cardsPerPage,
+    currentPage * cardsPerPage
   );
 
   return (
@@ -140,89 +162,141 @@ const Directory: React.FC = () => {
             <Loader2 size={36} className="animate-spin text-green-700" />
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((biz, i) => (
-              <motion.div 
-                key={biz.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="spotlight-card rounded-[1.5rem] p-6 group flex flex-col relative overflow-hidden"
-              >
-                {/* Business logo — upper right */}
-                {biz.logo_url && (
-                  <div className="absolute top-4 right-4 w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={biz.logo_url}
-                      alt={`${biz.business_name} logo`}
-                      className="w-full h-full object-contain p-1"
-                    />
+          <div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {paginated.map((biz, i) => (
+                <motion.div 
+                  key={biz.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="spotlight-card rounded-[1.5rem] p-6 group flex flex-col relative overflow-hidden"
+                >
+                  {/* Business logo — upper right */}
+                  {biz.logo_url && (
+                    <div className="absolute top-4 right-4 w-14 h-14 rounded-2xl bg-white/90 backdrop-blur-sm shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/40 flex items-center justify-center overflow-hidden transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_12px_40px_rgb(0,0,0,0.12)]">
+                      <img
+                        src={biz.logo_url}
+                        alt={`${biz.business_name} logo`}
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                  )}
+
+                  <div className={`mb-4 ${biz.logo_url ? "pr-[72px]" : ""}`}>
+                    <span className="text-[10px] font-heading font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 mb-3 inline-block">
+                      {biz.category}
+                    </span>
+                    <h3 className="font-heading font-bold text-lg text-[#0D1A14] leading-tight group-hover:text-green-700 transition-colors">
+                      {biz.business_name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                      <MapPin size={12} className="text-gray-400" /> {biz.address}
+                    </div>
                   </div>
-                )}
 
-                <div className={`mb-4 ${biz.logo_url ? "pr-14" : ""}`}>
-                  <span className="text-[10px] font-heading font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 mb-3 inline-block">
-                    {biz.category}
-                  </span>
-                  <h3 className="font-heading font-bold text-lg text-[#0D1A14] leading-tight group-hover:text-green-700 transition-colors">
-                    {biz.business_name}
-                  </h3>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
-                    <MapPin size={12} className="text-gray-400" /> {biz.address}
+                  <div className="space-y-2.5 mt-auto pt-4 border-t border-gray-50">
+                    {biz.contact_phone && (
+                      <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
+                        <Phone size={14} className="text-gray-400" /> {biz.contact_phone}
+                      </div>
+                    )}
+                    {biz.contact_email && (
+                      <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
+                        <Mail size={14} className="text-gray-400" /> {biz.contact_email}
+                      </div>
+                    )}
+                    {biz.website_url && (
+                      <div className="flex items-center gap-2.5 text-[13px] text-green-700 font-medium mt-1">
+                        <Globe size={14} className="text-green-600" /> 
+                        <a href={normaliseUrl(biz.website_url)} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
+                          {biz.website_url} <ExternalLink size={10} />
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Social links */}
+                    {(biz.facebook_url || biz.instagram_url) && (
+                      <div className="flex items-center gap-3 pt-1">
+                        {biz.facebook_url && (
+                          <a
+                            href={normaliseUrl(biz.facebook_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Facebook page"
+                            className="flex items-center gap-1.5 text-[12px] text-[#4267B2] hover:underline font-medium transition-opacity hover:opacity-80"
+                          >
+                            <FacebookIcon /> Facebook
+                          </a>
+                        )}
+                        {biz.instagram_url && (
+                          <a
+                            href={normaliseUrl(biz.instagram_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Instagram profile"
+                            className="flex items-center gap-1.5 text-[12px] font-medium transition-opacity hover:opacity-80"
+                            style={{ color: "#dc2743" }}
+                          >
+                            <InstagramIcon /> Instagram
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
+                </motion.div>
+              ))}
+            </div>
 
-                <div className="space-y-2.5 mt-auto pt-4 border-t border-gray-50">
-                  {biz.contact_phone && (
-                    <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
-                      <Phone size={14} className="text-gray-400" /> {biz.contact_phone}
-                    </div>
-                  )}
-                  {biz.contact_email && (
-                    <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
-                      <Mail size={14} className="text-gray-400" /> {biz.contact_email}
-                    </div>
-                  )}
-                  {biz.website_url && (
-                    <div className="flex items-center gap-2.5 text-[13px] text-green-700 font-medium mt-1">
-                      <Globe size={14} className="text-green-600" /> 
-                      <a href={normaliseUrl(biz.website_url)} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                        {biz.website_url} <ExternalLink size={10} />
-                      </a>
-                    </div>
-                  )}
+            {/* Pagination Controls */}
+            {!loading && totalCards > cardsPerPage && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 pt-8 border-t border-gray-200">
+                <span className="text-[13px] text-gray-500 font-medium font-semibold">
+                  Showing {Math.min(totalCards, (currentPage - 1) * cardsPerPage + 1)} - {Math.min(totalCards, currentPage * cardsPerPage)} of {totalCards} businesses
+                </span>
 
-                  {/* Social links */}
-                  {(biz.facebook_url || biz.instagram_url) && (
-                    <div className="flex items-center gap-3 pt-1">
-                      {biz.facebook_url && (
-                        <a
-                          href={normaliseUrl(biz.facebook_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Facebook page"
-                          className="flex items-center gap-1.5 text-[12px] text-[#4267B2] hover:underline font-medium transition-opacity hover:opacity-80"
-                        >
-                          <FacebookIcon /> Facebook
-                        </a>
-                      )}
-                      {biz.instagram_url && (
-                        <a
-                          href={normaliseUrl(biz.instagram_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Instagram profile"
-                          className="flex items-center gap-1.5 text-[12px] font-medium transition-opacity hover:opacity-80"
-                          style={{ color: "#dc2743" }}
-                        >
-                          <InstagramIcon /> Instagram
-                        </a>
-                      )}
-                    </div>
-                  )}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-green-700 hover:border-green-300 hover:bg-green-50/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-500 disabled:hover:border-gray-200 cursor-pointer transition-all"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .map((p, idx, arr) => {
+                      const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && <span className="px-2 text-gray-400 font-medium select-none">...</span>}
+                          <button
+                            onClick={() => setCurrentPage(p)}
+                            className={`w-9 h-9 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                              currentPage === p
+                                ? "bg-green-700 text-white shadow-diffuse"
+                                : "bg-white border border-gray-200 text-gray-600 hover:text-green-700 hover:border-green-300 hover:bg-green-50/50"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-green-700 hover:border-green-300 hover:bg-green-50/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-500 disabled:hover:border-gray-200 cursor-pointer transition-all"
+                    title="Next Page"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-              </motion.div>
-            ))}
+              </div>
+            )}
           </div>
         )}
         

@@ -31,6 +31,7 @@ interface RegistrationData {
   email: string;
   payment_method: string;
   payment_reference: string;
+  payment_proof_url?: string | null;
   payment_status: string;
   attendance_status: string;
   qr_code: string;
@@ -1415,6 +1416,27 @@ const EventRegistrants: React.FC = () => {
                     <span className="text-gray-400">Pass Code:</span>
                     <span className="font-mono text-white">{selectedReg.qr_code}</span>
                   </div>
+                  {selectedReg.payment_proof_url && (
+                    <div className="pt-2 border-t border-white/5 mt-2">
+                      <span className="text-gray-400 block mb-1.5">Proof of Payment:</span>
+                      <a
+                        href={selectedReg.payment_proof_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-full h-32 rounded-xl bg-black/40 border border-white/10 overflow-hidden relative group"
+                        title="Click to view full image"
+                      >
+                        <img
+                          src={selectedReg.payment_proof_url}
+                          alt="Payment Proof"
+                          className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold">
+                          Click to View Full Receipt
+                        </div>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div>

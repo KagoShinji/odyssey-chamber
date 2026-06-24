@@ -9,9 +9,10 @@ import {
   Users, CreditCard, CalendarDays, Newspaper, Building2, 
   Settings, TrendingUp, CheckCircle, XCircle, Trash2, Edit2, 
   Plus, ArrowRight, Loader2, QrCode, Search, Check, RefreshCw, X, ArrowLeft, Archive,
-  UserCheck, UserPlus, Copy, Shield, Receipt, FileDown
+  UserCheck, UserPlus, Copy, Shield, Receipt, FileDown, Upload, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 
 // Types matching the schema
 interface ProfileRow {
@@ -37,6 +38,7 @@ interface ApplicationRow {
   business_address: string | null;
   payment_method: string;
   payment_reference: string;
+  payment_proof_url?: string | null;
   status: string;
   invoice_number?: string | null;
   created_at: string;
@@ -226,13 +228,30 @@ const Admin: React.FC = () => {
   const [newMemberPassword, setNewMemberPassword] = useState("");
   const [createdCreds, setCreatedCreds] = useState<{ email: string; pass: string; name: string } | null>(null);
   const [editingMember, setEditingMember] = useState<ProfileRow | null>(null);
+  const [editMemberExpiresAt, setEditMemberExpiresAt] = useState("");
   const [memberStatusFilter, setMemberStatusFilter] = useState<"all" | "active" | "pending" | "expired">("all");
+  const [memberPlanFilter, setMemberPlanFilter] = useState("all");
+  const [memberCurrentPage, setMemberCurrentPage] = useState(1);
+  const [memberRowsPerPage, setMemberRowsPerPage] = useState(10);
 
   // Membership Applications Invoice Modal States
   const [showAppInvoiceModal, setShowAppInvoiceModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<ApplicationRow | null>(null);
   const [appInvoiceNumInput, setAppInvoiceNumInput] = useState("");
   const [appModalStatus, setAppModalStatus] = useState("pending");
+
+  // Excel Import States
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreviewData, setImportPreviewData] = useState<any[]>([]);
+  const [importTempPassword, setImportTempPassword] = useState("TalisayMember2026!");
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    successCount: number;
+    errors: string[];
+  } | null>(null);
 
   // Business Directory Management States
   const [showDirModal, setShowDirModal] = useState(false);
@@ -251,6 +270,12 @@ const Admin: React.FC = () => {
   const [dirLogoFile, setDirLogoFile] = useState<File | null>(null);
   const [dirLogoPreview, setDirLogoPreview] = useState("");
   const [dirLogoUploading, setDirLogoUploading] = useState(false);
+  const [dirIsVerified, setDirIsVerified] = useState(true);
+  const [dirIsFeatured, setDirIsFeatured] = useState(false);
+  const [dirSearchQuery, setDirSearchQuery] = useState("");
+  const [dirStatusFilter, setDirStatusFilter] = useState("all");
+  const [dirCurrentPage, setDirCurrentPage] = useState(1);
+  const [dirRowsPerPage, setDirRowsPerPage] = useState(10);
 
   // Review Edits Modal States
   const [showReviewEditsModal, setShowReviewEditsModal] = useState(false);
@@ -279,7 +304,7 @@ const Admin: React.FC = () => {
         .from("membership_applications")
         .select(`
           id, user_id, membership_type, company_name, business_category, phone, business_address, 
-          payment_method, payment_reference, status, invoice_number, created_at,
+          payment_method, payment_reference, payment_proof_url, status, invoice_number, created_at,
           profiles ( full_name, email )
         `)
         .order("created_at", { ascending: false });
@@ -317,6 +342,16 @@ const Admin: React.FC = () => {
       loadDatabase();
     }
   }, [user, isAdmin]);
+
+  // Reset pagination on filter or search changes
+  useEffect(() => {
+    setMemberCurrentPage(1);
+  }, [searchQuery, memberStatusFilter, memberPlanFilter]);
+
+  // Reset directory pagination on filter or search changes
+  useEffect(() => {
+    setDirCurrentPage(1);
+  }, [dirSearchQuery, dirStatusFilter]);
 
   // APPROVE MEMBERSHIP APPLICATION
   const handleApproveApplication = async (app: ApplicationRow) => {
@@ -1106,9 +1141,10 @@ const Admin: React.FC = () => {
         membership_type: newMemberCategory || null, // in this context newMemberCategory state stores plan when editing
         company_name: newMemberCompany.trim() || null,
         phone: newMemberPhone.trim() || null,
+        expires_at: editMemberExpiresAt ? new Date(editMemberExpiresAt).toISOString() : null,
       };
 
-      if (newMemberPlan === "active" && editingMember.membership_status !== "active") {
+      if (newMemberPlan === "active" && editingMember.membership_status !== "active" && !editMemberExpiresAt) {
         let expiryDate = new Date();
         expiryDate.setFullYear(expiryDate.getFullYear() + 1);
         updateData.expires_at = expiryDate.toISOString();
@@ -1201,6 +1237,7 @@ const Admin: React.FC = () => {
     setNewMemberPlan(member.membership_status || "active"); // used for status dropdown
     setNewMemberCategory(member.membership_type || "individual"); // used for plan dropdown
     setNewMemberPhone(member.phone || "");
+    setEditMemberExpiresAt(member.expires_at ? member.expires_at.split("T")[0] : "");
     setShowEditMemberModal(true);
   };
 
@@ -1257,6 +1294,32 @@ const Admin: React.FC = () => {
       toast.success("QR Setting updated!");
     } catch (err: any) {
       toast.error("Failed to save QR setting: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // DELETE QR PAYMENT METHOD
+  const handleDeleteQr = async (qr: QRSettingRow) => {
+    const confirmed = await confirm({
+      title: "Delete Payment Option",
+      message: `Are you sure you want to delete the "${qr.name}" payment method? This action cannot be undone.`,
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.from("qr_settings").delete().eq("id", qr.id);
+      if (error) throw error;
+      if (editingQr?.id === qr.id) {
+        setEditingQr(null);
+        setQrFile(null);
+      }
+      await loadDatabase();
+      toast.success(`"${qr.name}" payment option deleted.`);
+    } catch (err: any) {
+      toast.error("Failed to delete payment option: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -1460,6 +1523,8 @@ const Admin: React.FC = () => {
     setDirLogoFile(null);
     setDirLogoPreview("");
     setEditingDir(null);
+    setDirIsVerified(true);
+    setDirIsFeatured(false);
   };
 
   const handleSaveDirectory = async (e: React.FormEvent) => {
@@ -1498,7 +1563,8 @@ const Admin: React.FC = () => {
         logo_url: finalLogoUrl || null,
         facebook_url: dirFacebookUrl.trim() || null,
         instagram_url: dirInstagramUrl.trim() || null,
-        is_verified: true,
+        is_verified: dirIsVerified,
+        is_featured: dirIsFeatured,
         approval_status: "approved",
         pending_changes: null
       };
@@ -1605,7 +1671,194 @@ const Admin: React.FC = () => {
     setDirLogoFile(null);
     setDirFacebookUrl(biz.facebook_url || "");
     setDirInstagramUrl(biz.instagram_url || "");
+    setDirIsVerified(biz.is_verified || false);
+    setDirIsFeatured(biz.is_featured || false);
     setShowDirModal(true);
+  };
+
+  // Handle Excel file selection and parsing
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: "binary" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet);
+
+        // Normalize sheet columns
+        const normalized = json.map((row: any, index) => {
+          // Find full name key
+          const fullNameKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "full name" ||
+              k.toLowerCase() === "name" ||
+              k.toLowerCase() === "fullname" ||
+              k.toLowerCase() === "member name" ||
+              k.toLowerCase() === "name of member"
+          );
+          
+          // Find email key
+          const emailKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "email" ||
+              k.toLowerCase() === "email address" ||
+              k.toLowerCase() === "emailaddress"
+          );
+
+          // Find company key
+          const companyKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "company" ||
+              k.toLowerCase() === "company name" ||
+              k.toLowerCase() === "business" ||
+              k.toLowerCase() === "business name" ||
+              k.toLowerCase() === "business/company name"
+          );
+
+          // Find phone key
+          const phoneKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "phone" ||
+              k.toLowerCase() === "phone number" ||
+              k.toLowerCase() === "contact" ||
+              k.toLowerCase() === "contact number" ||
+              k.toLowerCase() === "mobile number" ||
+              k.toLowerCase() === "mobile"
+          );
+
+          // Find address key
+          const addressKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "address" ||
+              k.toLowerCase() === "business address"
+          );
+
+          // Find tier key
+          const tierKey = Object.keys(row).find(
+            (k) =>
+              k.toLowerCase() === "tier" ||
+              k.toLowerCase() === "plan" ||
+              k.toLowerCase() === "membership tier" ||
+              k.toLowerCase() === "membership plan" ||
+              k.toLowerCase() === "company size"
+          );
+
+          const rawFullName = fullNameKey ? String(row[fullNameKey]).trim() : "";
+          const rawEmail = emailKey ? String(row[emailKey]).trim() : "";
+          const rawCompany = companyKey ? String(row[companyKey]).trim() : "";
+          const rawPhone = phoneKey ? String(row[phoneKey]).trim() : "";
+          const rawAddress = addressKey ? String(row[addressKey]).trim() : "";
+          const rawTier = tierKey ? String(row[tierKey]).trim().toLowerCase() : "";
+
+          // Map tier string to database plan keys: individual, sme, corporate
+          let mappedTier = "individual";
+          if (rawTier.includes("sme") || rawTier.includes("medium")) {
+            mappedTier = "sme";
+          } else if (rawTier.includes("corporate") || rawTier.includes("large")) {
+            mappedTier = "corporate";
+          }
+
+          return {
+            rowNum: index + 2, // Excel rows are 1-indexed, headers are row 1
+            fullName: rawFullName,
+            email: rawEmail,
+            companyName: rawCompany,
+            phone: rawPhone,
+            address: rawAddress,
+            tier: mappedTier
+          };
+        });
+
+        // Filter out rows that don't have name and email
+        const validRows = normalized.filter((r) => r.fullName && r.email);
+        setImportPreviewData(validRows);
+
+        if (validRows.length === 0) {
+          toast.error("No valid rows found in Excel sheet. Make sure 'Full Name' and 'Email' headers exist.");
+        } else {
+          toast.success(`Loaded ${validRows.length} members from file.`);
+        }
+      } catch (err: any) {
+        toast.error("Failed to parse file: " + err.message);
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  // Sequentially import members calling pg RPC function
+  const handleStartImport = async () => {
+    if (importPreviewData.length === 0) {
+      toast.error("No data available to import.");
+      return;
+    }
+    if (!importTempPassword || importTempPassword.length < 6) {
+      toast.error("Please provide a valid temporary password (at least 6 characters).");
+      return;
+    }
+
+    setImporting(true);
+    setImportProgress({
+      current: 0,
+      total: importPreviewData.length,
+      successCount: 0,
+      errors: []
+    });
+
+    let successes = 0;
+    const errorsList: string[] = [];
+
+    for (let i = 0; i < importPreviewData.length; i++) {
+      const row = importPreviewData[i];
+      setImportProgress((prev) => prev ? { ...prev, current: i + 1 } : null);
+
+      try {
+        const { error } = await supabase.rpc("admin_import_member", {
+          p_email: row.email,
+          p_password: importTempPassword,
+          p_full_name: row.fullName,
+          p_company_name: row.companyName || null,
+          p_membership_type: row.tier,
+          p_phone: row.phone || null,
+          p_business_address: row.address || null,
+          p_expires_at: null // Expiry date is set individually after import
+        });
+
+        if (error) throw error;
+        successes++;
+      } catch (err: any) {
+        console.error(`Error importing row ${row.rowNum}:`, err.message);
+        errorsList.push(`Row ${row.rowNum} (${row.email}): ${err.message}`);
+      }
+    }
+
+    setImportProgress((prev) =>
+      prev
+        ? {
+            ...prev,
+            successCount: successes,
+            errors: errorsList
+          }
+        : null
+    );
+
+    setImporting(false);
+    await loadDatabase();
+    
+    if (errorsList.length === 0) {
+      toast.success(`Successfully imported all ${successes} members!`);
+    } else if (successes > 0) {
+      toast.info(`Import complete. Imported ${successes} of ${importPreviewData.length} members with some errors.`);
+    } else {
+      toast.error("Failed to import any members. Check row details or email registration conflicts.");
+    }
   };
 
   // Helper values for calculations
@@ -1619,6 +1872,65 @@ const Admin: React.FC = () => {
     const plan = pricing.find(pr => pr.type === p.membership_type);
     return sum + (plan ? Number(plan.price) : 0);
   }, 0);
+
+  // Filtered and Paginated Profiles
+  const filteredProfiles = profiles
+    .filter(p => p.membership_status !== "none")
+    .filter(p => {
+      if (memberStatusFilter === "all") return true;
+      if (memberStatusFilter === "active") return p.membership_status === "active";
+      if (memberStatusFilter === "pending") return p.membership_status === "pending";
+      if (memberStatusFilter === "expired") return p.membership_status === "expired" || p.membership_status === "rejected";
+      return true;
+    })
+    .filter(p => {
+      if (memberPlanFilter === "all") return true;
+      return p.membership_type === memberPlanFilter;
+    })
+    .filter(p => 
+      [p.full_name, p.email, p.company_name].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+  const totalFilteredCount = filteredProfiles.length;
+  const totalMemberPages = Math.ceil(totalFilteredCount / memberRowsPerPage) || 1;
+  const paginatedProfiles = filteredProfiles.slice(
+    (memberCurrentPage - 1) * memberRowsPerPage,
+    memberCurrentPage * memberRowsPerPage
+  );
+
+  // Filtered and Paginated Directory listings
+  const filteredDirectory = directory
+    .filter(biz => {
+      if (dirStatusFilter === "all") return true;
+      if (dirStatusFilter === "verified") return biz.is_verified === true;
+      if (dirStatusFilter === "pending") return biz.is_verified === false;
+      if (dirStatusFilter === "featured") return biz.is_featured === true;
+      return true;
+    })
+    .filter(biz => {
+      const searchLower = dirSearchQuery.toLowerCase();
+      const owner = profiles.find(p => p.id === biz.user_id);
+      const ownerName = owner ? (owner.full_name || "") : "";
+      const ownerEmail = owner ? (owner.email || "") : "";
+      
+      return [
+        biz.business_name || "",
+        biz.description || "",
+        biz.category || "",
+        biz.address || "",
+        biz.contact_email || "",
+        biz.contact_phone || "",
+        ownerName,
+        ownerEmail
+      ].join(" ").toLowerCase().includes(searchLower);
+    });
+
+  const totalDirFilteredCount = filteredDirectory.length;
+  const totalDirPages = Math.ceil(totalDirFilteredCount / dirRowsPerPage) || 1;
+  const paginatedDirectory = filteredDirectory.slice(
+    (dirCurrentPage - 1) * dirRowsPerPage,
+    dirCurrentPage * dirRowsPerPage
+  );
 
   // Show loading spinner while auth or page data is loading
   if (loading) {
@@ -2080,9 +2392,21 @@ const Admin: React.FC = () => {
                       placeholder="Search member..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-xs focus:border-green-500 outline-none text-white placeholder-gray-500"
+                      className="w-full pl-9 pr-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-xs focus:border-green-500 outline-none text-white placeholder-gray-500 font-semibold"
                     />
                   </div>
+                  <select
+                    value={memberPlanFilter}
+                    onChange={(e) => setMemberPlanFilter(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-xs focus:border-green-500 outline-none text-white font-semibold cursor-pointer"
+                  >
+                    <option value="all">All Plans</option>
+                    <option value="individual">Small Plan</option>
+                    <option value="sme">Medium Plan</option>
+                    <option value="corporate">Large Plan</option>
+                    <option value="enterprise">Enterprise Plan</option>
+                    <option value="associate">Associate Plan</option>
+                  </select>
                   <button
                     onClick={() => {
                       setNewMemberName("");
@@ -2106,6 +2430,19 @@ const Admin: React.FC = () => {
                   >
                     <UserPlus size={14} /> Add Member
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setImportFile(null);
+                      setImportPreviewData([]);
+                      setImportProgress(null);
+                      setImporting(false);
+                      setShowImportModal(true);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Upload size={14} /> Import from Excel
+                  </button>
                 </div>
               </div>
 
@@ -2122,66 +2459,54 @@ const Admin: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-semibold">
-                    {profiles
-                      .filter(p => p.membership_status !== "none")
-                      .filter(p => {
-                        if (memberStatusFilter === "all") return true;
-                        if (memberStatusFilter === "active") return p.membership_status === "active";
-                        if (memberStatusFilter === "pending") return p.membership_status === "pending";
-                        if (memberStatusFilter === "expired") return p.membership_status === "expired" || p.membership_status === "rejected";
-                        return true;
-                      })
-                      .filter(p => 
-                        [p.full_name, p.email, p.company_name].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
-                      )
-                      .map((item) => (
-                        <tr key={item.id} className="hover:bg-white/[0.01]">
-                          <td className="py-4.5 pl-2">
-                            <div className="text-white font-bold">{item.full_name || "N/A"}</div>
-                            <div className="text-[11px] text-[#8A9690] font-normal mt-0.5">{item.email}</div>
-                          </td>
-                          <td className="py-4.5">{getPlanDisplayName(item.membership_type)}</td>
-                          <td className="py-4.5">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                              item.membership_status === "active"
-                                ? "bg-green-500/10 text-green-400 border border-green-500/25"
-                                : item.membership_status === "pending"
-                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/25"
-                                : "bg-white/5 text-gray-400 border border-white/10"
-                            }`}>
-                              {item.membership_status}
-                            </span>
-                          </td>
-                          <td className="py-4.5">
-                            <div className="text-[#ECEFEF]">{item.company_name || "-"}</div>
-                            <div className="text-[10px] text-[#8A9690] font-normal mt-0.5">{item.phone || "-"}</div>
-                          </td>
-                          <td className="py-4.5 text-[#8A9690]">
-                            {item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}
-                          </td>
-                          <td className="py-4.5 text-right pr-2">
-                            <div className="flex items-center justify-end gap-1.5">
+                    {paginatedProfiles.map((item) => (
+                      <tr key={item.id} className="hover:bg-white/[0.01]">
+                        <td className="py-4.5 pl-2">
+                          <div className="text-white font-bold">{item.full_name || "N/A"}</div>
+                          <div className="text-[11px] text-[#8A9690] font-normal mt-0.5">{item.email}</div>
+                        </td>
+                        <td className="py-4.5">{getPlanDisplayName(item.membership_type)}</td>
+                        <td className="py-4.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                            item.membership_status === "active"
+                              ? "bg-green-500/10 text-green-400 border border-green-500/25"
+                              : item.membership_status === "pending"
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/25"
+                              : "bg-white/5 text-gray-400 border border-white/10"
+                          }`}>
+                            {item.membership_status}
+                          </span>
+                        </td>
+                        <td className="py-4.5">
+                          <div className="text-[#ECEFEF]">{item.company_name || "-"}</div>
+                          <div className="text-[10px] text-[#8A9690] font-normal mt-0.5">{item.phone || "-"}</div>
+                        </td>
+                        <td className="py-4.5 text-[#8A9690]">
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}
+                        </td>
+                        <td className="py-4.5 text-right pr-2">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleEditMemberClick(item)}
+                              className="px-2.5 py-1 rounded bg-[#1A382A] hover:bg-[#204936] text-[#ECEFEF] text-[10px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Edit2 size={11} /> Edit
+                            </button>
+                            {item.id !== user?.id && (
                               <button
-                                onClick={() => handleEditMemberClick(item)}
-                                className="px-2.5 py-1 rounded bg-[#1A382A] hover:bg-[#204936] text-[#ECEFEF] text-[10px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                                onClick={() => handleDeleteUser(item)}
+                                disabled={actionLoading}
+                                title="Delete member"
+                                className="p-1.5 rounded bg-red-900/30 hover:bg-red-800/50 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                               >
-                                <Edit2 size={11} /> Edit
+                                <Trash2 size={12} />
                               </button>
-                              {item.id !== user?.id && (
-                                <button
-                                  onClick={() => handleDeleteUser(item)}
-                                  disabled={actionLoading}
-                                  title="Delete member"
-                                  className="p-1.5 rounded bg-red-900/30 hover:bg-red-800/50 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    {profiles.filter(p => p.membership_status !== "none").length === 0 && (
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {totalFilteredCount === 0 && (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-[#8A9690]">
                           No members found.
@@ -2191,6 +2516,70 @@ const Admin: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {totalFilteredCount > 0 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5 text-xs text-gray-400 font-semibold">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Rows per page:</span>
+                    <select
+                      value={memberRowsPerPage}
+                      onChange={(e) => {
+                        setMemberRowsPerPage(Number(e.target.value));
+                        setMemberCurrentPage(1);
+                      }}
+                      className="px-2 py-1 bg-[#101D17] border border-white/10 rounded-lg text-white font-bold cursor-pointer outline-none focus:border-green-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-[11px] text-[#8A9690]">
+                      Showing {Math.min(totalFilteredCount, (memberCurrentPage - 1) * memberRowsPerPage + 1)} - {Math.min(totalFilteredCount, memberCurrentPage * memberRowsPerPage)} of {totalFilteredCount} members
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setMemberCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={memberCurrentPage === 1}
+                      className="p-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer transition-colors"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    
+                    {Array.from({ length: totalMemberPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalMemberPages || Math.abs(p - memberCurrentPage) <= 1)
+                      .map((p, idx, arr) => {
+                        const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                        return (
+                          <React.Fragment key={p}>
+                            {showEllipsis && <span className="px-1 text-gray-600">...</span>}
+                            <button
+                              onClick={() => setMemberCurrentPage(p)}
+                              className={`w-7 h-7 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                memberCurrentPage === p
+                                  ? "bg-green-700 text-white"
+                                  : "bg-white/[0.02] border border-white/5 text-gray-400 hover:text-white hover:bg-white/5"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+
+                    <button
+                      onClick={() => setMemberCurrentPage(prev => Math.min(totalMemberPages, prev + 1))}
+                      disabled={memberCurrentPage === totalMemberPages}
+                      className="p-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer transition-colors"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2436,18 +2825,28 @@ const Admin: React.FC = () => {
                         <p className="text-[11px] text-[#8A9690] mt-1 leading-relaxed max-w-sm">{qr.description}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setEditingQr(qr);
-                        setQrName(qr.name);
-                        setQrDesc(qr.description || "");
-                        setQrInstructions(qr.payment_instructions || "");
-                        setQrUrl(qr.qr_code_url || "");
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-[#11241C] hover:bg-[#152F24] text-xs font-semibold text-green-400 flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <Edit2 size={12} /> Edit Details
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingQr(qr);
+                          setQrName(qr.name);
+                          setQrDesc(qr.description || "");
+                          setQrInstructions(qr.payment_instructions || "");
+                          setQrUrl(qr.qr_code_url || "");
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-[#11241C] hover:bg-[#152F24] text-xs font-semibold text-green-400 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Edit2 size={12} /> Edit Details
+                      </button>
+                      <button
+                        onClick={() => handleDeleteQr(qr)}
+                        disabled={actionLoading}
+                        title="Delete payment option"
+                        className="p-2 rounded-xl bg-red-900/30 hover:bg-red-800/50 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2681,17 +3080,55 @@ const Admin: React.FC = () => {
         {/* TAB 8: BUSINESS DIRECTORY CMS */}
         {activeTab === "directory" && (
           <div className="bg-[#0A1410] border border-white/5 rounded-3xl p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h3 className="text-base font-heading font-black text-white">Business Directory Submissions</h3>
-              <button
-                onClick={() => {
-                  resetDirectoryForm();
-                  setShowDirModal(true);
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-700 text-white text-xs font-bold hover:bg-green-600 transition-colors shadow-diffuse cursor-pointer self-start sm:self-auto"
-              >
-                <Plus size={14} /> Add Directory Listing
-              </button>
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-base font-heading font-black text-white">Business Directory Submissions</h3>
+                  {/* Status Filters */}
+                  <div className="flex gap-1.5 mt-2">
+                    {[
+                      { id: "all", label: `All (${directory.length})` },
+                      { id: "verified", label: `Verified (${directory.filter(d => d.is_verified).length})` },
+                      { id: "pending", label: `Pending (${directory.filter(d => !d.is_verified).length})` },
+                      { id: "featured", label: `Featured (${directory.filter(d => d.is_featured).length})` },
+                    ].map(({ id, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setDirStatusFilter(id)}
+                        className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer border ${
+                          dirStatusFilter === id
+                            ? "bg-green-700/10 text-green-400 border-green-500/25"
+                            : "bg-white/[0.02] text-gray-400 border-white/5 hover:text-white"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  <div className="relative w-full sm:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Search listings..."
+                      value={dirSearchQuery}
+                      onChange={(e) => setDirSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-xs focus:border-green-500 outline-none text-white placeholder-gray-500 font-semibold"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetDirectoryForm();
+                      setShowDirModal(true);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-green-700 hover:bg-green-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus size={14} /> Add Listing
+                  </button>
+                </div>
+              </div>
             </div>
             
             <div className="overflow-x-auto">
@@ -2707,7 +3144,7 @@ const Admin: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-semibold">
-                  {directory.map((biz) => (
+                  {paginatedDirectory.map((biz) => (
                     <tr key={biz.id} className="hover:bg-white/[0.01]">
                       <td className="py-4.5 pl-2">
                         <div className="text-white font-bold">{biz.business_name}</div>
@@ -2791,6 +3228,69 @@ const Admin: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {totalDirFilteredCount > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-6 border-t border-white/5 text-[11px] text-[#8A9690]">
+                <div className="flex items-center gap-2 font-semibold">
+                  <span>Rows per page:</span>
+                  <select
+                    value={dirRowsPerPage}
+                    onChange={(e) => {
+                      setDirRowsPerPage(Number(e.target.value));
+                      setDirCurrentPage(1);
+                    }}
+                    className="px-2 py-1 bg-[#101D17] border border-white/10 rounded-lg text-white font-bold cursor-pointer outline-none focus:border-green-500"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span className="text-[11px] text-[#8A9690]">
+                    Showing {Math.min(totalDirFilteredCount, (dirCurrentPage - 1) * dirRowsPerPage + 1)} - {Math.min(totalDirFilteredCount, dirCurrentPage * dirRowsPerPage)} of {totalDirFilteredCount} listings
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDirCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={dirCurrentPage === 1}
+                    className="p-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer transition-colors"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  
+                  {Array.from({ length: totalDirPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalDirPages || Math.abs(p - dirCurrentPage) <= 1)
+                    .map((p, idx, arr) => {
+                      const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && <span className="px-1 text-gray-600">...</span>}
+                          <button
+                            onClick={() => setDirCurrentPage(p)}
+                            className={`w-7 h-7 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              dirCurrentPage === p
+                                ? "bg-green-700 text-white"
+                                : "bg-white/[0.02] border border-white/5 text-gray-400 hover:text-white hover:bg-white/5"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button
+                    onClick={() => setDirCurrentPage(prev => Math.min(totalDirPages, prev + 1))}
+                    disabled={dirCurrentPage === totalDirPages}
+                    className="p-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer transition-colors"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -3420,6 +3920,27 @@ const Admin: React.FC = () => {
                       <span className="text-white">{selectedApp.company_name}</span>
                     </div>
                   )}
+                  {selectedApp.payment_proof_url && (
+                    <div className="pt-2 border-t border-white/5 mt-2">
+                      <span className="text-gray-400 block mb-1.5">Proof of Payment:</span>
+                      <a
+                        href={selectedApp.payment_proof_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-full h-32 rounded-xl bg-black/40 border border-white/10 overflow-hidden relative group"
+                        title="Click to view full image"
+                      >
+                        <img
+                          src={selectedApp.payment_proof_url}
+                          alt="Payment Proof"
+                          className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold">
+                          Click to View Full Receipt
+                        </div>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -3772,6 +4293,17 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-[#8A9690] mb-1 font-bold">Membership Expiry Date</label>
+                  <input
+                    type="date"
+                    value={editMemberExpiresAt}
+                    onChange={(e) => setEditMemberExpiresAt(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none focus:border-green-500 transition-colors font-semibold"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Leave blank or modify to set when this membership will expire.</p>
+                </div>
+
                 <div className="flex gap-2.5 pt-4 border-t border-white/5">
                   <button
                     type="submit"
@@ -4006,6 +4538,34 @@ const Admin: React.FC = () => {
                   </p>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={dirIsVerified}
+                      onChange={(e) => setDirIsVerified(e.target.checked)}
+                      className="w-4 h-4 rounded border-white/10 bg-[#101D17] text-green-600 focus:ring-green-500 accent-green-600"
+                    />
+                    <div>
+                      <span className="block text-white text-xs">Verified Display</span>
+                      <span className="block text-[10px] text-[#8A9690] font-normal">Show in public directory</span>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={dirIsFeatured}
+                      onChange={(e) => setDirIsFeatured(e.target.checked)}
+                      className="w-4 h-4 rounded border-white/10 bg-[#101D17] text-green-600 focus:ring-green-500 accent-green-600"
+                    />
+                    <div>
+                      <span className="block text-white text-xs">Featured Listing</span>
+                      <span className="block text-[10px] text-[#8A9690] font-normal">Highlight listing</span>
+                    </div>
+                  </label>
+                </div>
+
                 <div className="flex gap-2.5 pt-4 border-t border-white/5">
                   <button
                     type="submit"
@@ -4105,6 +4665,172 @@ const Admin: React.FC = () => {
                 >
                   Cancel
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EXCEL IMPORT MODAL */}
+      <AnimatePresence>
+        {showImportModal && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-2xl bg-[#0A1410] border border-white/10 rounded-3xl p-6 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-start mb-6 pb-4 border-b border-white/5">
+                <div>
+                  <h3 className="font-heading font-black text-white text-lg flex items-center gap-2">
+                    <Upload className="text-green-400" size={20} />
+                    Import Members from Excel / CSV
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Upload a spreadsheet with member details to bulk register them.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  disabled={importing}
+                  className="p-1.5 rounded-xl border border-white/5 text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs text-gray-300">
+                {/* Configuration: password */}
+                <div className="p-4.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div>
+                    <label className="block text-[#8A9690] mb-1 font-bold">Default Temporary Password *</label>
+                    <input
+                      type="text"
+                      required
+                      value={importTempPassword}
+                      onChange={(e) => setImportTempPassword(e.target.value)}
+                      placeholder="Temporary password for all"
+                      disabled={importing}
+                      className="w-full px-3 py-2 bg-[#101D17] border border-white/10 rounded-xl text-white outline-none focus:border-green-500 transition-colors font-semibold"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">Users will use this password to log in for the first time. You can set the membership expiration date for each member individually from the members list after the import is complete.</p>
+                  </div>
+                </div>
+
+                {/* File Upload Selector */}
+                <div>
+                  <label className="block text-[#8A9690] mb-1 font-bold">Upload File (.xlsx, .xls, .csv)</label>
+                  <div className="flex items-center gap-4">
+                    <label
+                      htmlFor="member-excel-upload"
+                      className="cursor-pointer flex items-center justify-center gap-2 px-4 py-3 bg-[#101D17] hover:bg-[#152F24] border border-white/10 hover:border-green-500 rounded-xl text-white text-xs transition-colors flex-1 text-center font-bold"
+                    >
+                      <Upload size={14} />
+                      {importFile ? importFile.name : "Select Excel/CSV Document"}
+                    </label>
+                    <input
+                      id="member-excel-upload"
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      onChange={handleFileChange}
+                      disabled={importing}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Columns should ideally include: <strong>Full Name</strong> (or Name), <strong>Email</strong>, and optionally: Company Name, Phone, Address, Tier.
+                  </p>
+                </div>
+
+                {/* Progress bar and logs */}
+                {importProgress && (
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span className="text-[#8A9690]">Import Status:</span>
+                      <span className="text-white">
+                        {importProgress.current} / {importProgress.total} processed ({importProgress.successCount} successful)
+                      </span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 transition-all duration-300"
+                        style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    {/* Error log list */}
+                    {importProgress.errors.length > 0 && (
+                      <div className="space-y-1 mt-2">
+                        <span className="text-red-400 font-bold block">Encountered Errors:</span>
+                        <div className="max-h-24 overflow-y-auto bg-red-950/20 border border-red-500/10 rounded-xl p-2.5 text-[10px] text-red-300 font-mono space-y-1">
+                          {importProgress.errors.map((err, i) => (
+                            <div key={i}>{err}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Data Preview */}
+                {importPreviewData.length > 0 && !importing && !importProgress && (
+                  <div>
+                    <label className="block text-[#8A9690] mb-2 font-bold">Parsed Members Preview ({importPreviewData.length} records)</label>
+                    <div className="overflow-x-auto border border-white/5 rounded-2xl max-h-48">
+                      <table className="w-full text-left text-[11px] font-normal border-collapse">
+                        <thead>
+                          <tr className="bg-white/[0.02] border-b border-white/5 text-[#8A9690] font-bold uppercase">
+                            <th className="p-2.5">Name</th>
+                            <th className="p-2.5">Email</th>
+                            <th className="p-2.5">Company</th>
+                            <th className="p-2.5 text-center">Tier</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreviewData.map((row, idx) => (
+                            <tr key={idx} className="border-b border-white/5 text-gray-300 hover:bg-white/[0.01]">
+                              <td className="p-2.5 font-semibold text-white">{row.fullName}</td>
+                              <td className="p-2.5 font-mono">{row.email}</td>
+                              <td className="p-2.5">{row.companyName || "-"}</td>
+                              <td className="p-2.5 text-center">
+                                <span className="capitalize px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-semibold border border-green-500/20">
+                                  {row.tier}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Buttons */}
+                <div className="flex gap-2.5 pt-4 border-t border-white/5 mt-6">
+                  <button
+                    type="button"
+                    onClick={handleStartImport}
+                    disabled={importing || importPreviewData.length === 0}
+                    className="flex-1 py-3 rounded-xl bg-green-700 hover:bg-green-600 text-white font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-diffuse text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} /> Importing members...
+                      </>
+                    ) : (
+                      "Start Member Import"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(false)}
+                    disabled={importing}
+                    className="px-4 py-3 border border-white/10 hover:bg-white/5 rounded-xl text-gray-400 cursor-pointer text-xs"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

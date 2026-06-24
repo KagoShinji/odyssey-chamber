@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { 
   CalendarDays, MapPin, Clock, ArrowRight, Newspaper, 
-  ArrowUpRight, Loader2, CheckCircle2, QrCode, CreditCard, X
+  ArrowUpRight, Loader2, CheckCircle2, QrCode, CreditCard, X,
+  Camera, Upload
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import { useNavigate } from "react-router-dom";
+import { uploadImage } from "../../lib/storage";
 
 const spring: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -104,6 +106,8 @@ export const EventsSection: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
@@ -170,6 +174,8 @@ export const EventsSection: React.FC = () => {
     setRegSuccess(false);
     setRegError(null);
     setPaymentReference("");
+    setPaymentProofFile(null);
+    setPaymentProofPreview("");
     setRegQrCodePass("");
   };
 
@@ -194,14 +200,24 @@ export const EventsSection: React.FC = () => {
       return;
     }
 
+    if (applicablePrice > 0 && !paymentProofFile) {
+      setRegError("Please upload an image of your payment receipt as proof.");
+      return;
+    }
+
     setRegLoading(true);
     setRegError(null);
 
     try {
+      let proofUrl = null;
+      if (applicablePrice > 0 && paymentProofFile) {
+        proofUrl = await uploadImage(paymentProofFile, "payment-proofs");
+      }
+
       const qrPassCode = `EVT-${Math.floor(100000 + Math.random() * 900000)}`;
       setRegQrCodePass(qrPassCode);
 
-      const regData = {
+      const regData: any = {
         event_id: selectedEvent.id,
         user_id: user ? user.id : null,
         full_name: regName,
@@ -213,10 +229,16 @@ export const EventsSection: React.FC = () => {
         qr_code: qrPassCode,
       };
 
+      if (proofUrl) {
+        regData.payment_proof_url = proofUrl;
+      }
+
       const { error } = await supabase.from("event_registrations").insert(regData);
       if (error) throw error;
 
       setRegSuccess(true);
+      setPaymentProofFile(null);
+      setPaymentProofPreview("");
     } catch (err: any) {
       setRegError(err.message || "Failed to submit event registration.");
     } finally {
@@ -504,6 +526,42 @@ export const EventsSection: React.FC = () => {
                               onChange={(e) => setPaymentReference(e.target.value)}
                               className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:border-green-500 outline-none transition-all"
                             />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-heading font-bold text-gray-500 uppercase mb-1">Proof of Payment Image *</label>
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {paymentProofPreview ? (
+                                <img src={paymentProofPreview} alt="Receipt Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <Camera size={18} className="text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <label
+                                htmlFor="evt-proof-upload"
+                                className="cursor-pointer flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 hover:border-green-500 rounded-xl text-[11px] font-bold text-gray-600 transition-colors w-full"
+                              >
+                                <Upload size={12} />
+                                {paymentProofFile ? paymentProofFile.name : "Select Receipt Image"}
+                              </label>
+                              <input
+                                id="evt-proof-upload"
+                                type="file"
+                                accept="image/*"
+                                required
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setPaymentProofFile(file);
+                                    setPaymentProofPreview(URL.createObjectURL(file));
+                                  }
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

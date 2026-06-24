@@ -10,8 +10,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- Only allow execution by users who have 'admin' role in profiles
-  IF (SELECT role FROM public.profiles WHERE id = auth.uid()) <> 'admin' THEN
+  -- Only allow execution by admins
+  IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Access denied: Only admins can delete users.';
   END IF;
 
