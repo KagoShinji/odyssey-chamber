@@ -10,7 +10,7 @@ const GrainOverlay: React.FC = () => (
 );
 
 const partners = [
-  { name: "Province of Cebu", logo: "/Cebu_province_seal_2.svg.png" },
+
   { name: "City of Talisay", logo: "/talisaycitylogo.jpeg" },
   { name: "DTI", logo: "/dtilogo.png" },
 ];
@@ -21,7 +21,7 @@ const PartnersSection: React.FC = () => (
       <h2 className="text-3xl md:text-4xl font-heading font-extrabold text-[#2b3e5a] mb-12">
         Our Partners
       </h2>
-      
+
       <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 lg:gap-28">
         {partners.map(({ name, logo }, i) => (
           <motion.div

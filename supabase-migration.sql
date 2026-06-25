@@ -132,6 +132,7 @@ create table public.news (
   summary text not null,
   content text not null,
   image_url text,
+  images text[] default '{}'::text[],
   category text not null,
   read_time text default '3 min' not null,
   author text not null default 'Chamber Admin',

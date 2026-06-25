@@ -4,7 +4,7 @@ import type { Variants } from "framer-motion";
 import { 
   CalendarDays, MapPin, Clock, ArrowRight, Newspaper, 
   ArrowUpRight, Loader2, CheckCircle2, QrCode, CreditCard, X,
-  Camera, Upload
+  Camera, Upload, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { supabase } from "../../lib/supabase";
@@ -12,6 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useNotification } from "../../context/NotificationContext";
 import { useNavigate } from "react-router-dom";
 import { uploadImage } from "../../lib/storage";
+import QRDisplay from "../dashboard/QRDisplay";
 
 const spring: Variants = {
   hidden: { opacity: 0, y: 28 },
@@ -505,8 +506,10 @@ export const EventsSection: React.FC = () => {
                         </div>
 
                         {selectedPayment && (
-                          <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col sm:flex-row items-center gap-4 text-xs">
-                            <img src={selectedPayment.qr_code_url} alt="QR" className="w-24 h-24 object-contain bg-white p-1 rounded-lg border" />
+                          <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3 text-xs">
+                            <div className="flex flex-col items-center">
+                              <QRDisplay qr={selectedPayment} lightboxId="evt-qr-lightbox" />
+                            </div>
                             <div>
                               <h5 className="font-heading font-bold text-gray-900">{selectedPayment.name}</h5>
                               <p className="text-[10px] text-gray-400 mt-0.5 leading-normal">{selectedPayment.payment_instructions}</p>
@@ -593,6 +596,11 @@ export const NewsSection: React.FC = () => {
   const [dbNews, setDbNews] = useState<any[]>([]);
   const [selectedNews, setSelectedNews] = useState<any | null>(null);
   const navigate = useNavigate();
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveImgIndex(0);
+  }, [selectedNews]);
 
   useEffect(() => {
     const fetchNews = async () => {
@@ -714,11 +722,68 @@ export const NewsSection: React.FC = () => {
 
               <h3 className="text-2xl font-heading font-black text-gray-900 mb-4 leading-tight">{selectedNews.title}</h3>
               
-              {selectedNews.image_url && (
-                <div className="h-64 rounded-2xl overflow-hidden mb-6">
-                  <img src={selectedNews.image_url} alt={selectedNews.title} className="w-full h-full object-cover" />
-                </div>
-              )}
+              {(() => {
+                const articleImages = selectedNews.images && selectedNews.images.length > 0
+                  ? selectedNews.images
+                  : (selectedNews.image_url ? [selectedNews.image_url] : []);
+                return articleImages.length > 0 && (
+                  <div className="relative rounded-2xl overflow-hidden mb-6 bg-slate-900/5 dark:bg-slate-900/10 flex items-center justify-center min-h-[240px] max-h-[480px]">
+                    <img
+                      src={articleImages[activeImgIndex]}
+                      alt={`${selectedNews.title} photo ${activeImgIndex + 1}`}
+                      className="max-h-[480px] w-auto object-contain transition-all duration-300 mx-auto"
+                    />
+                    
+                    {articleImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImgIndex((prev) => (prev === 0 ? articleImages.length - 1 : prev - 1));
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/85 text-white rounded-full p-2 transition-all cursor-pointer z-10"
+                          aria-label="Previous image"
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImgIndex((prev) => (prev === articleImages.length - 1 ? 0 : prev + 1));
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/85 text-white rounded-full p-2 transition-all cursor-pointer z-10"
+                          aria-label="Next image"
+                        >
+                          <ChevronRight size={18} />
+                        </button>
+                        
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/40 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                          {articleImages.map((_url: string, idx: number) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveImgIndex(idx);
+                              }}
+                              className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${
+                                idx === activeImgIndex ? "bg-white scale-125" : "bg-white/55 hover:bg-white/80"
+                              }`}
+                              aria-label={`Go to slide ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                        
+                        <span className="absolute top-3 right-3 text-[10px] bg-black/60 text-white px-2 py-0.5 rounded-full font-mono z-10 font-bold">
+                          {activeImgIndex + 1} / {articleImages.length}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               <p className="font-heading font-semibold text-gray-600 text-sm mb-6 leading-relaxed bg-gray-50 p-4.5 border-l-4 border-green-700 rounded-r-xl">
                 {selectedNews.summary}
