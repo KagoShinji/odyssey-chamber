@@ -107,9 +107,8 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!loading) {
       if (!user) navigate("/login");
-      else if (isAdmin) navigate("/admin");
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, loading, navigate]);
 
   // Sync profile fields when dynamic profile loads
   useEffect(() => {
