@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { 
   Users, CreditCard, CalendarDays, Newspaper, Building2, 
-  TrendingUp, QrCode, Shield, ArrowLeft, RefreshCw, Loader2, UserCheck
+  TrendingUp, QrCode, Shield, ArrowLeft, RefreshCw, Loader2, UserCheck, Key
 } from "lucide-react";
 
 // Tab Subcomponents
@@ -18,6 +18,7 @@ import { QRsTab } from "../components/admin/QRsTab";
 import { NewsTab } from "../components/admin/NewsTab";
 import { DirectoryTab } from "../components/admin/DirectoryTab";
 import { BoardTab } from "../components/admin/BoardTab";
+import { PasswordTab } from "../components/admin/PasswordTab";
 
 export const Admin: React.FC = () => {
   const { user, loading, isAdmin } = useAuth();
@@ -25,11 +26,11 @@ export const Admin: React.FC = () => {
 
   // Active Tab routing state
   const [activeTab, setActiveTab] = useState<
-    "analytics" | "applications" | "users" | "members" | "events" | "pricing" | "qrs" | "news" | "directory" | "board"
+    "analytics" | "applications" | "users" | "members" | "events" | "pricing" | "qrs" | "news" | "directory" | "board" | "password"
   >(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    const validTabs = ["analytics", "applications", "users", "members", "events", "pricing", "qrs", "news", "directory", "board"];
+    const validTabs = ["analytics", "applications", "users", "members", "events", "pricing", "qrs", "news", "directory", "board", "password"];
     return (tab && validTabs.includes(tab) ? tab : "analytics") as any;
   });
 
@@ -101,6 +102,7 @@ export const Admin: React.FC = () => {
             { id: "news", label: "News & Announcements", icon: Newspaper },
             { id: "directory", label: "Business Directory", icon: Building2 },
             { id: "board", label: "Board of Directors", icon: Shield },
+            { id: "password", label: "Change Password", icon: Key },
           ].map(({ id, label, icon: Icon, count }) => (
             <button
               key={id}
@@ -152,6 +154,7 @@ export const Admin: React.FC = () => {
             { id: "news", label: "News CMS", icon: Newspaper },
             { id: "directory", label: "Directory", icon: Building2 },
             { id: "board", label: "Board", icon: Shield },
+            { id: "password", label: "Change Password", icon: Key },
           ].map(({ id, label, icon: Icon, count }) => (
             <button
               key={id}
@@ -216,6 +219,7 @@ export const Admin: React.FC = () => {
           {activeTab === "news" && <NewsTab key={refreshKey} />}
           {activeTab === "directory" && <DirectoryTab key={refreshKey} />}
           {activeTab === "board" && <BoardTab key={refreshKey} />}
+          {activeTab === "password" && <PasswordTab key={refreshKey} />}
         </div>
       </main>
     </div>
