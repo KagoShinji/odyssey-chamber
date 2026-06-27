@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
-import { Shield, User, Award } from "lucide-react";
+import { Shield, User, Award, X, BookOpen } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 interface BoardMember {
@@ -10,11 +10,13 @@ interface BoardMember {
   position: string;
   rank: number;
   image_url: string | null;
+  autobiography?: string | null;
 }
 
 const BoardOfDirectors: React.FC = () => {
   const [members, setMembers] = useState<BoardMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMember, setSelectedMember] = useState<BoardMember | null>(null);
 
   useEffect(() => {
     const fetchBoard = async () => {
@@ -138,8 +140,17 @@ const BoardOfDirectors: React.FC = () => {
                     <motion.div
                       key={member.id}
                       variants={cardVariants}
-                      whileHover={{ y: -6 }}
-                      className="group relative rounded-[2rem] bg-white border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col justify-between p-6 transition-all duration-300 hover:shadow-[0_20px_50px_rgba(22,101,52,0.08)] hover:border-green-600/10"
+                      whileHover={member.autobiography ? { y: -6 } : {}}
+                      onClick={() => {
+                        if (member.autobiography) {
+                          setSelectedMember(member);
+                        }
+                      }}
+                      className={`group relative rounded-[2rem] bg-white border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col justify-between p-6 transition-all duration-300 ${
+                        member.autobiography 
+                          ? "cursor-pointer hover:shadow-[0_20px_50px_rgba(22,101,52,0.08)] hover:border-green-600/10" 
+                          : ""
+                      }`}
                     >
                       {/* Decorative elements inside card */}
                       <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-green-500/10 transition-colors" />
@@ -176,10 +187,21 @@ const BoardOfDirectors: React.FC = () => {
                         <p className="text-xs font-bold text-amber-600 uppercase tracking-widest font-heading">
                           {member.position}
                         </p>
+                        
+                        {member.autobiography && (
+                          <p className="text-xs text-gray-400 mt-4 leading-relaxed line-clamp-3 font-medium max-w-[240px]">
+                            {member.autobiography}
+                          </p>
+                        )}
                       </div>
 
                       {/* Small border separator and details */}
-                      <div className="border-t border-gray-50 mt-6 pt-4.5 flex justify-center text-[11px] font-medium text-gray-400 group-hover:text-gray-500 transition-colors">
+                      <div className="border-t border-gray-50 mt-6 pt-4.5 flex flex-col items-center gap-1.5 w-full text-[11px] font-medium text-gray-400 group-hover:text-gray-500 transition-colors">
+                        {member.autobiography && (
+                          <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-0.5 animate-pulse">
+                            Click to read biography
+                          </span>
+                        )}
                         <span>Talisay Chamber Officer</span>
                       </div>
                     </motion.div>
@@ -202,8 +224,17 @@ const BoardOfDirectors: React.FC = () => {
                     <motion.div
                       key={member.id}
                       variants={cardVariants}
-                      whileHover={{ y: -4 }}
-                      className="group bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4 shadow-[0_4px_25px_rgba(0,0,0,0.01)] transition-all hover:shadow-[0_12px_35px_rgba(22,101,52,0.04)] hover:border-green-600/5"
+                      whileHover={member.autobiography ? { y: -4 } : {}}
+                      onClick={() => {
+                        if (member.autobiography) {
+                          setSelectedMember(member);
+                        }
+                      }}
+                      className={`group bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4 transition-all ${
+                        member.autobiography 
+                          ? "cursor-pointer hover:shadow-[0_12px_35px_rgba(22,101,52,0.04)] hover:border-green-600/5" 
+                          : "shadow-[0_4px_25px_rgba(0,0,0,0.01)]"
+                      }`}
                     >
                       {/* Smaller Photo Frame */}
                       <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center relative shadow-sm">
@@ -220,13 +251,18 @@ const BoardOfDirectors: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="text-left min-w-0">
+                      <div className="text-left min-w-0 flex-1">
                         <h4 className="text-xs font-heading font-bold text-gray-900 leading-snug truncate group-hover:text-green-800 transition-colors" title={member.name}>
                           {member.name}
                         </h4>
                         <p className="text-[10px] text-gray-400 font-semibold tracking-wide uppercase mt-0.5">
                           {member.position || "Director"}
                         </p>
+                        {member.autobiography && (
+                          <p className="text-[10px] text-gray-400 mt-1.5 leading-normal line-clamp-2 font-medium">
+                            {member.autobiography}
+                          </p>
+                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -236,6 +272,60 @@ const BoardOfDirectors: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Autobiography Modal */}
+      <AnimatePresence>
+        {selectedMember && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl border border-gray-150 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh] text-left relative"
+            >
+              <button
+                onClick={() => setSelectedMember(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex flex-col items-center text-center pb-6 border-b border-gray-100">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 flex items-center justify-center relative shadow-sm mb-4">
+                  {selectedMember.image_url ? (
+                    <img
+                      src={selectedMember.image_url}
+                      alt={selectedMember.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-green-800 to-emerald-950 flex items-center justify-center text-white font-heading font-black text-2xl">
+                      {getInitials(selectedMember.name)}
+                    </div>
+                  )}
+                </div>
+
+                <h3 className="text-xl font-heading font-black text-gray-900 leading-tight mb-1">
+                  {selectedMember.name}
+                </h3>
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-widest font-heading">
+                  {selectedMember.position}
+                </p>
+              </div>
+
+              <div className="pt-6">
+                <div className="flex items-center gap-2 mb-3 text-xs font-heading font-black text-green-700 uppercase tracking-wider">
+                  <BookOpen size={14} />
+                  <span>Biography / Profile</span>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line font-medium">
+                  {selectedMember.autobiography}
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

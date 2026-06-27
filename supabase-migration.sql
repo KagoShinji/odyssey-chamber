@@ -720,3 +720,5 @@ INSERT INTO public.board_members (name, position, rank, image_url) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 
+-- Migration: Add autobiography column to board_members table
+ALTER TABLE public.board_members ADD COLUMN IF NOT EXISTS autobiography text;

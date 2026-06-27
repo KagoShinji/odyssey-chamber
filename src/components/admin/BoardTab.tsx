@@ -11,6 +11,7 @@ interface BoardMemberRow {
   position: string;
   rank: number;
   image_url: string | null;
+  autobiography?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +33,7 @@ export const BoardTab: React.FC = () => {
   const [boardImgUrl, setBoardImgUrl] = useState("");
   const [boardImgFile, setBoardImgFile] = useState<File | null>(null);
   const [boardImgPreview, setBoardImgPreview] = useState("");
+  const [boardAutobiography, setBoardAutobiography] = useState("");
 
   // Search & Pagination states
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -67,6 +69,7 @@ export const BoardTab: React.FC = () => {
     setBoardImgUrl("");
     setBoardImgFile(null);
     setBoardImgPreview("");
+    setBoardAutobiography("");
   };
 
   const handleSaveBoardMember = async (e: React.FormEvent) => {
@@ -88,6 +91,7 @@ export const BoardTab: React.FC = () => {
         position: boardPosition.trim(),
         rank: Number(boardRank),
         image_url: finalImgUrl || null,
+        autobiography: boardAutobiography.trim() || null,
       };
 
       if (editingBoardMember) {
@@ -144,6 +148,7 @@ export const BoardTab: React.FC = () => {
     setBoardRank(member.rank);
     setBoardImgUrl(member.image_url || "");
     setBoardImgPreview(member.image_url || "");
+    setBoardAutobiography(member.autobiography || "");
     setShowBoardModal(true);
   };
 
@@ -367,6 +372,17 @@ export const BoardTab: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-[#101D17] border border-white/10 focus:border-green-500 rounded-xl outline-none text-white font-semibold font-mono"
                   />
                   <span className="text-[10px] text-gray-500 mt-1 block font-normal">Low rank numbers sort first. E.g. President = 1, VPs = 2, Directors = 10+.</span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-heading font-black text-[#8A9690] uppercase tracking-wider mb-1.5">Autobiography / Biography</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Enter autobiography or biography details..."
+                    value={boardAutobiography}
+                    onChange={(e) => setBoardAutobiography(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#101D17] border border-white/10 focus:border-green-500 rounded-xl outline-none text-white font-semibold resize-none"
+                  />
                 </div>
 
                 {/* Photo Upload */}
